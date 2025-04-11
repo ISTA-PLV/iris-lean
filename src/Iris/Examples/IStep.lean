@@ -1,11 +1,37 @@
+/-
+Copyright (c) 2025 Michael Sammler. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Michael Sammler
+-/
 import Iris.BI
 import Iris.ProofMode
 import Iris.Examples.IStepAttr
+
+/-
+next steps:
+- rename tactics and everything to a consistent name
+- add support for ⌜P⌝ -∗ G
+- add support for ⌜P⌝ ∗ G
+- add support for lif where one cannot prove either side
+- add syntax for Lithium goals
+- look into performance
+- figure out how to avoid dsimp in wpsubst
+- define wp
+- add more lithium connectives
+- prove sorrys
+- do more examples
+- define a notation for the language
+
+ideas:
+- handle everything with a single tactic that has a DiscrTree and entries of the DiscrTree can be either lemmas or tactics?
+  - this would make the system completely extensible
+-/
 
 namespace Iris.ProofMode
 open Lean Elab Tactic Meta Qq BI Std
 
 --def profileitM (_ : Type) (_ : String) (_ : Options) (act : TacticM α) : TacticM α := act
+-- TODO: add backtracking like rep <- 10 in rocq? Would need to make sure that it stays tail recursive
 partial def repCore (f : MVarId → TacticM (List MVarId)) (goals : List MVarId) (nsteps : Option Nat) : TacticM (Nat × List MVarId) :=
   go 0 goals
 where
@@ -218,6 +244,12 @@ theorem lif_false [BI PROP] {cond} {P P1 P2 : PROP}
  : P ⊢ lif cond P1 P2 :=
    sorry
 
+syntax "istepsolve" : tactic
+--macro_rules
+--  | `(tactic|istepsolve) => `(tactic|trivial)
+macro_rules
+  | `(tactic|istepsolve) => `(tactic|solve| simp)
+
 variable {prop : Q(Type u)} (bi : Q(BI $prop)) (Q : Q($prop)) in
 def iLifCore {e} (hyps : Hyps bi e)
   : TacticM (Q($e ⊢ $Q) × Expr) := do
@@ -225,7 +257,7 @@ def iLifCore {e} (hyps : Hyps bi e)
 
   let mcond : Q($cond) ← mkFreshExprSyntheticOpaqueMVar cond
   try
-    let _ ← evalTacticAt (← `(tactic|solve | simp)) mcond.mvarId!
+    let _ ← evalTacticAt (← `(tactic|istepsolve)) mcond.mvarId!
     let m : Q($e ⊢ $P1) ← mkFreshExprSyntheticOpaqueMVar <|
       IrisGoal.toExpr { prop, bi, hyps := hyps, goal := P1 }
     return (q(lif_true $mcond $m), m)
@@ -233,7 +265,7 @@ def iLifCore {e} (hyps : Hyps bi e)
 
   let mnegcond : Q(¬$cond) ← mkFreshExprSyntheticOpaqueMVar q(¬ $cond)
   try
-    let _ ← evalTacticAt (← `(tactic|solve | simp)) mnegcond.mvarId!
+    let _ ← evalTacticAt (← `(tactic|istepsolve)) mnegcond.mvarId!
     let m : Q($e ⊢ $P2) ← mkFreshExprSyntheticOpaqueMVar <|
       IrisGoal.toExpr { prop, bi, hyps := hyps, goal := P2 }
     return (q(lif_false $mnegcond $m), m)
@@ -483,10 +515,10 @@ theorem wp_test (P : Val -> PROP) :
 def rec_fn : Val :=
   .recv "f" "x" (.ife (.binop (.var "x") .eq (.val (.nat 0))) (.val (.nat 0)) (.app (.var "f") (.binop (.var "x") .minus (.val (.nat 1)))))
 
---set_option profiler true in
---set_option profiler.threshold 1 in
+-- set_option profiler true in
+-- set_option profiler.threshold 1 in
 #time theorem wp_test2 (P : Val -> PROP) :
-  P (.nat 0) ⊢ wp (.app (.val rec_fn) (.val (.nat 20))) (λ v => iprop(P v ∗ True)) := by
+  P (.nat 0) ⊢ wp (.app (.val rec_fn) (.val (.nat 200))) (λ v => iprop(P v ∗ True)) := by
   istart
   unfold rec_fn
   --isubst <;> iautoapply
