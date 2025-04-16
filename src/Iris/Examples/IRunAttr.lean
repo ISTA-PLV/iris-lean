@@ -9,6 +9,8 @@ import Iris.BI
 
 open Lean Elab Tactic Meta Qq Iris.BI
 
+register_simp_attr irun_simp
+
 def IRunTacticType : Type := MVarId → TacticM (Option (List MVarId × List MVarId))
 
 def IRunTacticType.run (tac : IRunTacticType) : MVarId → TacticM (Option (List MVarId × List MVarId)) := tac
