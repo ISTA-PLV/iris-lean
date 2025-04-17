@@ -39,8 +39,6 @@ def unpackEntails : Expr → Option (Expr × Expr)
   | .app (.app (.app (.app (.const ``Entails _) _) _) G') G => some (G', G)
   | _ => none
 
-#check Syntax
-
 def irun_default_prio : Nat := 10
 
 initialize registerBuiltinAttribute {
@@ -67,32 +65,18 @@ initialize unsafe registerBuiltinAttribute {
   descr := "irun tactic"
   -- we ignore TC failures for BI, they should just create metavariables
   add := fun decl stx kind => MetaM.run' do Elab.Term.TermElabM.run' (ctx := {ignoreTCFailures := true}) do
-    -- IO.println s!"{stx}"
     let prio := if stx[1][0].isMissing then some irun_default_prio else stx[1][0].isNatLit?
     let .some prio := prio | throwError "unknown prio: {stx[1][0]}"
-    -- IO.println s!"prio: {prio}"
 
-    -- TODO: for some reason this is not necessary anymore
-    -- todo can we somehow disable typeclass search during elaboration?
-    -- elaborate the patterns. We create a dummy [BiBase] to make elaboration succeed
-    -- let propId ← mkFreshFVarId
-    -- let biId ← mkFreshFVarId
-    -- let ctx ← getLCtx
-    -- let ctx := ctx.mkLocalDecl propId .anonymous (.sort 0)
-    -- let ctx := ctx.mkLocalDecl biId .anonymous (mkApp (mkConst ``BIBase) (.fvar propId))
-      -- withLCtx ctx (← getLocalInstances) do
-      -- withNewLocalInstance ``BIBase (.fvar biId) do
-    let pats ←
-        stx[2].getSepArgs.mapM λ stx => do
-          let stx ← `(iprop($(TSyntax.mk stx)))
-          Term.elabTerm stx none
-    -- IO.println s!"{pats}"
+    let pats ← stx[2].getSepArgs.mapM λ stx => do
+      let stx ← `(iprop($(TSyntax.mk stx)))
+      Term.elabTerm stx none
 
     let ty := (← getConstInfo decl).type
     if ty != .const ``IRunTacticType [] then
-      throwError "The tactic should have type IRunTacticType"
+      throwError "The tactic should have type IRunTacticType."
     -- is this the compilation the right thing to do?
-    let .defnInfo d ← getConstInfo decl | throwError "The tactic should be a definition"
+    let .defnInfo d ← getConstInfo decl | throwError "The tactic should be a definition."
     compileDecl (.defnDecl d)
     let tac ← evalConst IRunTacticType decl
     for pat in pats do

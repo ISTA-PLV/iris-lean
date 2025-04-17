@@ -31,6 +31,13 @@ theorem irun_apply.{u} {PROP : Type u} [BI PROP] {P Q Q' : PROP}
   (h2 : P ⊢ Q')
  : P ⊢ Q := h2.trans h1
 
+def dsimpWithExt (ext_name : Name) (e : Expr) : TacticM (Expr × Simp.Stats) := do
+  let ext ← Lean.Meta.getSimpExtension? ext_name
+  let theorems ← ext.get!.getTheorems
+  let { ctx:=simpctx, .. } ← mkSimpContext .missing (eraseLocal := false) (kind := .dsimp) (simpTheorems := pure theorems)
+  -- TODO: use simpprocs as well?
+  Meta.dsimp e simpctx {}
+
 --def profileitM (_ : Type) (_ : String) (_ : Options) (act : TacticM α) : TacticM α := act
 partial def irunCore (nsteps : Option Nat) : TacticM Unit := do profileitM Exception "irun" (← getOptions) do
   -- TODO: keep track of [IrisGoal]s instead of just MVars such that tactics can avoid reparsing
@@ -44,31 +51,31 @@ partial def irunCore (nsteps : Option Nat) : TacticM Unit := do profileitM Excep
     if ← goal.isAssigned then
       goals := goals'
       continue
-    -- reduce matches
     let mut progress_match := false
 
-    repeat do
-      let g ← instantiateMVars <| ← goal.getType
-      let some #[prop, bi, P, G] := g.appM? ``Entails' | throwError "not in proof mode"
-      unless (← isMatcherApp G) do
-        break
-      match (← reduceRecMatcher? G) with
-      | some G' =>
-        let g' := mkApp4 (.const ``Entails' [g.getAppFn.constLevels![0]!])
-          prop bi P G'
-        goal := ← goal.replaceTargetDefEq g'
-        progress_match := true
-        -- logInfo m!"AFTER REDUCE: {← goal.getType}"
-      | none    => throwError s!"Cannot reduce matcher at step {n}"
+    -- reduce matches, very cheap
+    -- TODO: make this an option?
+    if true then
+      repeat do
+        let g ← instantiateMVars <| ← goal.getType
+        let some #[prop, bi, P, G] := g.appM? ``Entails' | throwError "not in proof mode"
+        unless (← isMatcherApp G) do
+          break
+        match (← reduceRecMatcher? G) with
+        | some G' =>
+          let g' := mkApp4 (.const ``Entails' [g.getAppFn.constLevels![0]!])
+            prop bi P G'
+          goal := ← goal.replaceTargetDefEq g'
+          progress_match := true
+          -- logInfo m!"AFTER REDUCE: {← goal.getType}"
+        | none    => throwError s!"Cannot reduce matcher at step {n}"
 
-/-
-    let ext ← Lean.Meta.getSimpExtension? `irun_simp
-    let theorems ← ext.get!.getTheorems
-    let { ctx:=simpctx, .. } ← goal.withContext <| mkSimpContext .missing (eraseLocal := false) (kind := .dsimp) (simpTheorems := pure theorems)
-    let g ← instantiateMVars <| ← goal.getType
-    let ⟨g_new, _⟩ ← Meta.dsimp g simpctx {}
-    goal := ← goal.replaceTargetDefEq g_new
--/
+    -- call dsimp on the goal, very expensive
+    -- TODO: make this an option?
+    if false then
+      let g ← instantiateMVars <| ← goal.getType
+      let ⟨g_new, _⟩ ← goal.withContext (dsimpWithExt `irun_simp g)
+      goal := ← goal.replaceTargetDefEq g_new
 
     -- find a tactic or lemma to apply to the goal
     let (progress, goals'', shelved') ← goal.withContext do
@@ -104,7 +111,6 @@ partial def irunCore (nsteps : Option Nat) : TacticM Unit := do profileitM Excep
           let .some (goals_new, shelved_new) ← tac.tac.run goal | continue
           return (true, goals_new++goals', shelved++shelved_new)
       return (false, goal::goals', shelved)
-      --return (true, goal::goals', shelved)
     if !progress && !progress_match then
       break
     n := n+1
@@ -114,54 +120,6 @@ partial def irunCore (nsteps : Option Nat) : TacticM Unit := do profileitM Excep
   if !(nsteps == .none || nsteps == .some n) then
     logInfo s!"Did {n} steps"
   setGoals (goals ++ shelved)
-
-/-
-partial def irunCore (nsteps : Option Nat) : TacticM Unit := do
-  let goals ← getGoals
-  let (n, goals) ← go 0 goals []
-  IO.println s!"Did {n} steps"
-  setGoals goals
-where
-  go : Nat → List MVarId → List MVarId → TacticM (Nat × List MVarId)
-  | n, [], shelved => return (n, shelved)
-  | n, goal::goals, shelved => do
-    if nsteps = some n then
-      return (n, goal::goals ++ shelved)
-    if ← goal.isAssigned then
-      go n goals shelved
-    else
-      let (progress, (goals : List MVarId), (shelved : List MVarId)) ← goal.withContext do
-        let g ← instantiateMVars <| ← goal.getType
-        let some { u, prop, bi, e, hyps, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
-        let tree := irunExt.getState (← getEnv)
-        let G ← instantiateExprMVars G
-        if G.isMVar then throwError "iRun failed: goal has free metavars"
-        let tacs ← tree.getMatch G
-        let tacs := tacs.insertionSort λ a b => a.prio < b.prio
-        for tac in tacs do
-          match tac.tac with
-          | .inl decl =>
-            let info ← getConstInfo decl
-            let pf := mkConst decl (← mkFreshLevelMVarsFor info)
-            let (args, _, targetTy) ← forallMetaTelescopeReducing (← inferType pf)
-            let .some (Gnew, Gdecl) := (unpackEntails targetTy) | throwError "theorem is not entails, this should not happen"
-            let .true ← isDefEq G Gdecl | continue
-            -- TODO: try to solve all unsolved args using a tactic
-            let m ← mkFreshExprSyntheticOpaqueMVar <|
-              IrisGoal.toExpr { prop, bi, hyps := hyps, goal := Gnew }
-            let pf := mkApp7 (.const ``irun_apply [u]) prop bi e G Gnew (mkAppN pf args) m
-            goal.assign pf
-            return (true, m.mvarId!::goals, shelved)
-          | .inr tac =>
-            --let (goals', shelved') ← tac.tac.run goal
-            --return (true, goals'++goals, shelved++shelved')
-            return (true, goal::goals, shelved)
-        --return (false, goal::goals, shelved))
-        return (true, goal::goals, shelved)
-      if !progress then
-        return (n, goals++shelved)
-      go (n+1) goals shelved
--/
 
 elab "irun" : tactic => do
   irunCore none
