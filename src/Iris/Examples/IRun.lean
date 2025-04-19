@@ -31,13 +31,6 @@ theorem irun_apply.{u} {PROP : Type u} [BI PROP] {P Q Q' : PROP}
   (h2 : P ⊢ Q')
  : P ⊢ Q := h2.trans h1
 
-def dsimpWithExt (ext_name : Name) (e : Expr) : TacticM (Expr × Simp.Stats) := do
-  let ext ← Lean.Meta.getSimpExtension? ext_name
-  let theorems ← ext.get!.getTheorems
-  let { ctx:=simpctx, .. } ← mkSimpContext .missing (eraseLocal := false) (kind := .dsimp) (simpTheorems := pure theorems)
-  -- TODO: use simpprocs as well?
-  Meta.dsimp e simpctx {}
-
 --def profileitM (_ : Type) (_ : String) (_ : Options) (act : TacticM α) : TacticM α := act
 partial def irunCore (nsteps : Option Nat) : TacticM Unit := do profileitM Exception "irun" (← getOptions) do
   -- TODO: keep track of [IrisGoal]s instead of just MVars such that tactics can avoid reparsing

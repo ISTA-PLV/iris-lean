@@ -353,7 +353,7 @@ set_option profiler true in
   P (.nat 0) ⊢ wp (.app (.val rec_fn) (.val (.nat 200))) (λ v => iprop(P v ∗ True)) := by
   istart
   unfold rec_fn
-  --set_option trace.profiler true in
+  -- set_option trace.profiler true in
   --set_option trace.profiler.threshold 1 in
   irun ∞
 

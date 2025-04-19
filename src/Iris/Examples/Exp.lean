@@ -40,6 +40,10 @@ def subst (x : String) (v : Val) : Exp → Exp
 
 def wp [BI PROP] (e : Exp) (P : Val -> PROP) : PROP := by sorry
 
+theorem wp_wand e (P1 P2 : Val -> PROP) :
+  ⊢ wp e P1 -∗ (∀ v, P1 v -∗ P2 v) -∗ wp e P2
+  := by sorry
+
 namespace Reify
 open Lean
 inductive Exp where

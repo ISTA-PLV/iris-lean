@@ -9,7 +9,24 @@ import Iris.BI
 
 open Lean Elab Tactic Meta Qq Iris.BI
 
+namespace Iris.ProofMode
+
+def dsimpWithExt (ext_name : Name) (e : Expr) : MetaM (Expr × Simp.Stats) := do
+  let ext ← Lean.Meta.getSimpExtension? ext_name
+  let theorems ← ext.get!.getTheorems
+  let simpctx := ← Simp.mkContext (simpTheorems := #[theorems])
+ --let { ctx:=simpctx, .. } ← mkSimpContext .missing (eraseLocal := false) (kind := .dsimp) (simpTheorems := pure theorems)
+  -- TODO: use simpprocs as well?
+  Meta.dsimp e simpctx {}
+
+def simpWithExt (ext_name : Name) (e : Expr) : MetaM (Simp.Result × Simp.Stats) := do
+  let ext ← Lean.Meta.getSimpExtension? ext_name
+  let theorems ← ext.get!.getTheorems
+  let simpctx := ← Simp.mkContext (simpTheorems := #[theorems])
+  Meta.simp e simpctx {}
+
 register_simp_attr irun_simp
+register_simp_attr irun_preprocess
 
 def IRunTacticType : Type := MVarId → TacticM (Option (List MVarId × List MVarId))
 
@@ -41,19 +58,31 @@ def unpackEntails : Expr → Option (Expr × Expr)
 
 def irun_default_prio : Nat := 10
 
+syntax (name := irun) "irun" ("?")? (num)?  : attr
+
 initialize registerBuiltinAttribute {
   name := `irun
   descr := "irun lemma"
   add := fun decl stx kind => MetaM.run' do
-    let prio := if stx[1][0].isMissing then some irun_default_prio else stx[1][0].isNatLit?
+    let prio := if stx[2][0].isMissing then some irun_default_prio else stx[1][0].isNatLit?
     let .some prio := prio | throwError "unknown prio: {stx[1][0]}"
-    let declTy := (← getConstInfo decl).type
-    let (_, _, targetTy) ← withReducible <| forallMetaTelescopeReducing declTy
+    let declInfo ← getConstInfo decl
+    let declTy := declInfo.type
+    let (e, ty) ← forallTelescope declTy λ args ty => do
+      let (res, _) ← simpWithExt `irun_preprocess ty
+      let ty := res.expr
+      return (← mkLambdaFVars args (← res.mkCast (mkAppN (← mkConstWithLevelParams decl) args)), ← mkForallFVars args ty)
+    if !stx[1][0].isMissing then
+      logInfo m!"{ty}"
+    let newName : Name := .str declInfo.name "irun"
+    let newDecl := (.defnDecl {name := newName, levelParams := declInfo.levelParams, type := ty, value := e, hints := .opaque, safety := .safe })
+    addDecl newDecl
+    let (_, _, targetTy) ← withReducible <| forallMetaTelescopeReducing ty
     match unpackEntails targetTy with
     | some (_, G) =>
       -- IO.println s!"{G}"
       let key ← DiscrTree.mkPath G
-      irunExt.add (⟨.inl decl, prio⟩, key) kind
+      irunExt.add (⟨.inl newName, prio⟩, key) kind
     | _ => throwError "@[irun] unexpected type"
 }
 
