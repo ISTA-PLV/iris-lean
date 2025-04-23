@@ -81,9 +81,11 @@ partial def irunCore (nsteps : Option Nat) : TacticM Unit := do profileitM Excep
       let tacs ← tree.getMatch G
       let tacs := tacs.insertionSort λ a b => a.prio < b.prio
       for tac in tacs do
+        -- logInfo m!"trying {tac.name}"
         match tac.tac with
         | .inl decl =>
           let info ← getConstInfo decl
+          -- TODO: create new mvar level to prevent instantiating mvars in the goal, see https://leanprover.zulipchat.com/#narrow/channel/270676-lean4/topic/Difference.20between.20DiscrTree.2EgetMatch.20and.20DiscrTree.2EgetUnify/near/513194806 ?
           let pf := mkConst decl (← mkFreshLevelMVarsFor info)
           let (args, _, targetTy) ← forallMetaTelescopeReducing (← inferType pf)
           let .some (Gnew, Gdecl) := (unpackEntails targetTy) | throwError "theorem is not entails, this should not happen"
@@ -93,7 +95,7 @@ partial def irunCore (nsteps : Option Nat) : TacticM Unit := do profileitM Excep
             let mvarId := mvar.mvarId!
             if ! (← mvarId.isAssigned) && ! (← mvarId.isDelayedAssigned) then
               -- TODO: try to solve all unsolved args using a tactic
-              throwError s!"not assigned: {← mvarId.getType}"
+              throwError s!"[irun] argument with type `{← mvarId.getType}` of lemma {tac.name} not instantiated by unification"
 
           let m ← mkFreshExprSyntheticOpaqueMVar <|
             IrisGoal.toExpr { prop, bi, hyps := hyps, goal := Gnew }

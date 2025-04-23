@@ -33,16 +33,16 @@ def IRunTacticType : Type := MVarId → TacticM (Option (List MVarId × List MVa
 def IRunTacticType.run (tac : IRunTacticType) : MVarId → TacticM (Option (List MVarId × List MVarId)) := tac
 
 structure IRunTactic where
-  name : Name
   tac : IRunTacticType
 
 structure IRunEntry where
   tac : Name ⊕ IRunTactic
   prio : Nat
+  name : Name
 instance : BEq IRunEntry where
   beq _ _ := false
 instance : Inhabited IRunEntry where
-  default := ⟨.inl default, 0⟩
+  default := ⟨.inl default, 0, default⟩
 
 /-- Environment extension for `irun` -/
 initialize irunExt :
@@ -80,9 +80,9 @@ initialize registerBuiltinAttribute {
     let (_, _, targetTy) ← withReducible <| forallMetaTelescopeReducing ty
     match unpackEntails targetTy with
     | some (_, G) =>
-      -- IO.println s!"{G}"
       let key ← DiscrTree.mkPath G
-      irunExt.add (⟨.inl newName, prio⟩, key) kind
+      -- logInfo m!"Goal: {G}, key: {key}"
+      irunExt.add (⟨.inl newName, prio, decl⟩, key) kind
     | _ => throwError "@[irun] unexpected type"
 }
 
@@ -110,5 +110,5 @@ initialize unsafe registerBuiltinAttribute {
     let tac ← evalConst IRunTacticType decl
     for pat in pats do
       let key ← DiscrTree.mkPath pat
-      irunExt.add (⟨.inr ⟨decl, tac⟩, prio⟩, key) kind
+      irunExt.add (⟨.inr ⟨tac⟩, prio, decl⟩, key) kind
 }

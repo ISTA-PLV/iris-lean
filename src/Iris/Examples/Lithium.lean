@@ -3,14 +3,23 @@ Copyright (c) 2025 Michael Sammler. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Michael Sammler
 -/
+--import Lean.Parser.Do
+--import Lean.Elab.Do
 import Iris.BI
 import Iris.ProofMode
 import Iris.Examples.IRunAttr
 import Iris.Examples.IRun
 import Iris.Examples.Exp
 
+-- this avoids the warnings from sorry
+axiom exfalso (P : Prop) : P
+syntax "mysorry" : tactic
+macro_rules
+--| `(tactic|mysorry) => `(tactic|sorry)
+| `(tactic|mysorry) => `(tactic|apply exfalso)
+
 /-
-next steps:
+Next steps:
 - rename tactics and everything to a consistent name
 - add support for ⌜P⌝ -∗ G
 - add support for ⌜P⌝ ∗ G
@@ -33,6 +42,8 @@ macro_rules
   | `($a ≫= $args) => `(.bind $a $args)
   | `($a ≫ $args) => `(.bind $a λ _ => $args)
 
+attribute [irun_preprocess] Pure.pure Bind.bind
+
 namespace Iris.Lithium
 open Lean BI Std
 
@@ -47,6 +58,7 @@ structure InEx (α : Type v) where
 structure Li (α : Type v) where
   run : (α → PROP) → PROP
   mono' E1 E2 : ⊢ run E1 -∗ (∀ a, E1 a -∗ E2 a) -∗ run E2
+attribute [irun_preprocess] Li.run
 
 section InEx
 
@@ -67,6 +79,7 @@ def prop (P : Prop) : @InEx PROP Unit := own iprop(⌜P⌝)
 
 end InEx
 
+@[irun_preprocess]
 def Li.pure (a : α) : @Li PROP _ α := {
   run E := E a
   mono' E1 E2 := by
@@ -76,22 +89,29 @@ def Li.pure (a : α) : @Li PROP _ α := {
     iassumption
 }
 
+@[irun_preprocess]
 def Li.bind (G1 : @Li PROP _ α) (G2 : α → @Li PROP _ β) :
   @Li PROP _ β := {
   run E := G1.run (λ a => (G2 a).run E)
   mono' E1 E2 := by
     dsimp
     iintro HE Hwand
-    sorry
+    mysorry
 }
 
 instance : Monad (@Li PROP _) where
   pure := .pure
   bind := .bind
 
+def empty : PEmpty → PROP := λ e => nomatch e
+
+@[irun_preprocess]
+def Li.go (G : @Li PROP _ PEmpty) : PROP := G.run empty
+
 def exhaleR (L : @InEx PROP α) (E : α → PROP) : PROP :=
   iprop(∃ a, L.body a ∗ E a)
 
+@[irun_preprocess]
 def exhale (L : @InEx PROP α) : @Li PROP _ α := {
   run := exhaleR L
   mono' E1 E2 := by
@@ -107,6 +127,7 @@ def exhale (L : @InEx PROP α) : @Li PROP _ α := {
 def inhaleR (L : @InEx PROP α) (E : α → PROP) : PROP :=
   iprop(∀ a, L.body a -∗ E a)
 
+@[irun_preprocess]
 def inhale (L : @InEx PROP α) : @Li PROP _ α := {
   run := inhaleR L
   mono' E1 E2 := by
@@ -120,6 +141,7 @@ def inhale (L : @InEx PROP α) : @Li PROP _ α := {
 def allR (α : Type v) (E : α → PROP) : PROP :=
   iprop(∀ a, E a)
 
+@[irun_preprocess]
 def all (α : Type v) : @Li PROP _ α := {
   run := allR α
   mono' E1 E2 := by
@@ -132,6 +154,7 @@ def all (α : Type v) : @Li PROP _ α := {
 
 def doneR : PROP := iprop(True)
 
+@[irun_preprocess]
 def done : @Li PROP _ α := {
   run E := doneR
   mono' E1 E2 := by
@@ -143,27 +166,27 @@ def done : @Li PROP _ α := {
 def lifR (P : Prop) (E1 E2 : PROP) : PROP :=
   iprop((⌜P⌝ -∗ E1) ∧ (⌜¬P⌝ -∗ E2))
 
+@[irun_preprocess]
 def lif (P : Prop) (G1 G2 : @Li PROP _ α) : @Li PROP _ α := {
   run E := lifR P (G1.run E) (G2.run E)
   mono' E1 E2 := by
     dsimp
     iintro HE Hwand
-    sorry
+    mysorry
 }
 
 def dsimpR {α : Type _} [BI PROP] (_ : Lean.Name) (a : α) (E : α → PROP) : PROP := E a
 
+@[irun_preprocess]
 def dsimp {α : Type _} [BI PROP] (n : Lean.Name) (a : α) : @Li PROP _ α := {
   run := dsimpR n a
   mono' E1 E2 := by
     simp [dsimpR]
-    sorry
+    mysorry
 }
 
-def empty : Empty → PROP := λ e => nomatch e
-
 -- TODO: add R variant
-def dualizing (G : @Li PROP _ Empty) : @Li PROP _ Unit := {
+def dualizing (G : @Li PROP _ PEmpty) : @Li PROP _ Unit := {
   run E := iprop(G.run empty -∗ E ⟨⟩)
   mono' E1 E2 := by
     dsimp
@@ -200,43 +223,185 @@ notation:25 P:29 ":-" Q:25 => (∀ E, Li.run Q E ⊢ P E)
 --    .pure a ⇓ E ⊣ E a := by
 --     simp [Li.pure, Li.run, Li.run]
 
-attribute [irun_preprocess] inhale exhale Lithium.done Li.run Li.bind
+attribute [irun_preprocess] Li.run
 
 @[irun]
 theorem exhale_bind (L1 : @InEx PROP α) (L2 : α → InEx β) :
   exhaleR (L1.bind L2) :-
     ((exhale L1).bind λ a => exhale (L2 a)) := by
     dsimp [exhaleR, InEx.bind]
-    sorry
+    mysorry
 
 @[irun]
 theorem inhale_bind (L1 : @InEx PROP α) (L2 : α → InEx β) E :
   inhaleR (L1.bind L2) E ⊣
    inhaleR L1 λ a => inhaleR (L2 a) E := by
     dsimp [inhaleR, InEx.bind]
-    sorry
+    mysorry
 
 @[irun]
 theorem exhale_pure (a : α) E :
   exhaleR (PROP:=PROP) (.pure a) E ⊣ E a := by
     dsimp [exhaleR, InEx.pure]
-    sorry
+    mysorry
 
 @[irun]
 theorem inhale_pure (a : α) E :
   inhaleR (PROP:=PROP) (.pure a) E ⊣ E a := by
     dsimp [inhaleR, InEx.pure]
-    sorry
+    mysorry
 
 
-set_option pp.universes true
+--set_option pp.universes true
 
 def test_inex (A : @Atom PROP Nat) : @InEx PROP Bool :=
   atom A ≫= λ n =>
   own (A.ref n) ≫
   .pure (n == 1)
 
+/-
+section test
+open Elab Term Lean.Parser.Term Parser
+
+syntax (name := gdo) "gdo" doSeq:term
+
+private def liftMethodDelimiter (k : SyntaxNodeKind) : Bool :=
+  k == ``Lithium.gdo ||
+  k == ``Parser.Term.do ||
+  k == ``Parser.Term.doSeqIndent ||
+  k == ``Parser.Term.doSeqBracketed ||
+  k == ``Parser.Term.termReturn ||
+  k == ``Parser.Term.termUnless ||
+  k == ``Parser.Term.termTry ||
+  k == ``Parser.Term.termFor
+
+private def getDoSeqElems (doSeq : Syntax) : List Syntax :=
+  if doSeq.getKind == ``Parser.Term.doSeqBracketed then
+    doSeq[1].getArgs.toList.map fun arg => arg[0]
+  else if doSeq.getKind == ``Parser.Term.doSeqIndent then
+    doSeq[0].getArgs.toList.map fun arg => arg[0]
+  else
+    []
+
+private def getDoSeq (doStx : Syntax) : Syntax :=
+  doStx[1]
+
+
+/-- Given `stx` which is a `letPatDecl`, `letEqnsDecl`, or `letIdDecl`, return true if it has binders. -/
+private def letDeclArgHasBinders (letDeclArg : Syntax) : Bool :=
+  let k := letDeclArg.getKind
+  if k == ``Parser.Term.letPatDecl then
+    false
+  else if k == ``Parser.Term.letEqnsDecl then
+    true
+  else if k == ``Parser.Term.letIdDecl then
+    -- letIdLhs := binderIdent >> checkWsBefore "expected space before binders" >> many (ppSpace >> letIdBinder)) >> optType
+    let binders := letDeclArg[1]
+    binders.getNumArgs > 0
+  else
+    false
+
+/-- Return `true` if the given `letDecl` contains binders. -/
+private def letDeclHasBinders (letDecl : Syntax) : Bool :=
+  letDeclArgHasBinders letDecl[0]
+
+private def liftMethodForbiddenBinder (stx : Syntax) : Bool :=
+  let k := stx.getKind
+  -- TODO: make this extensible in the future.
+  if k == ``Parser.Term.fun || k == ``Parser.Term.matchAlts ||
+     k == ``Parser.Term.doLetRec || k == ``Parser.Term.letrec then
+     -- It is never ok to lift over this kind of binder
+    true
+  -- The following kinds of `let`-expressions require extra checks to decide whether they contain binders or not
+  else if k == ``Parser.Term.let then
+    letDeclHasBinders stx[1]
+  else if k == ``Parser.Term.doLet then
+    letDeclHasBinders stx[2]
+  else if k == ``Parser.Term.doLetArrow then
+    letDeclArgHasBinders stx[2]
+  else
+    false
+
+private partial def hasLiftMethod : Syntax → Bool
+  | Syntax.node _ k args =>
+    if liftMethodDelimiter k then false
+    -- NOTE: We don't check for lifts in quotations here, which doesn't break anything but merely makes this rare case a
+    -- bit slower
+    else if k == ``Parser.Term.liftMethod then true
+    -- For `pure` if-then-else, we only lift `(<- ...)` occurring in the condition.
+    else if k == ``termDepIfThenElse || k == ``termIfThenElse then args.size >= 2 && hasLiftMethod args[1]!
+    else args.any hasLiftMethod
+  | _ => false
+
+variable (baseId : Name) in
+private partial def expandLiftMethodAux (inQuot : Bool) (inBinder : Bool) : Syntax → StateT (List Syntax) TermElabM Syntax
+  | stx@(Syntax.node i k args) =>
+    if k == choiceKind then do
+      -- choice node: check that lifts are consistent
+      let alts ← stx.getArgs.mapM (expandLiftMethodAux inQuot inBinder · |>.run [])
+      let (_, lifts) := alts[0]!
+      unless alts.all (·.2 == lifts) do
+        throwErrorAt stx "cannot lift `(<- ...)` over inconsistent syntax variants, consider lifting out the binding manually"
+      modify (· ++ lifts)
+      return .node i k (alts.map (·.1))
+    else if liftMethodDelimiter k then
+      return stx
+    -- For `pure` if-then-else, we only lift `(<- ...)` occurring in the condition.
+    else if h : args.size >= 2 ∧ (k == ``termDepIfThenElse || k == ``termIfThenElse) then do
+      let inAntiquot := stx.isAntiquot && !stx.isEscapedAntiquot
+      let arg1 ← expandLiftMethodAux (inQuot && !inAntiquot || stx.isQuot) inBinder args[1]
+      let args := args.set! 1 arg1
+      return Syntax.node i k args
+    else if k == ``Parser.Term.liftMethod && !inQuot then withFreshMacroScope do
+      if inBinder then
+        throwErrorAt stx "cannot lift `(<- ...)` over a binder, this error usually happens when you are trying to lift a method nested in a `fun`, `let`, or `match`-alternative, and it can often be fixed by adding a missing `do`"
+      let term := args[1]!
+      let term ← expandLiftMethodAux inQuot inBinder term
+      -- keep name deterministic across choice branches
+      let id ← mkIdentFromRef (.num baseId (← get).length)
+      let auxDoElem : Syntax ← `(doElem| let $id:ident ← $term:term)
+      modify fun s => s ++ [auxDoElem]
+      return id
+    else do
+      let inAntiquot := stx.isAntiquot && !stx.isEscapedAntiquot
+      let inBinder   := inBinder || (!inQuot && liftMethodForbiddenBinder stx)
+      let args ← args.mapM (expandLiftMethodAux (inQuot && !inAntiquot || stx.isQuot) inBinder)
+      return Syntax.node i k args
+  | stx => return stx
+
+#check Lean.Elab.Term.Do.ToCodeBlock.expandLiftMethod
+
+def expandLiftMethod (doElem : Syntax) : TermElabM (List Syntax × Syntax) := do
+  if !hasLiftMethod doElem then
+    return ([], doElem)
+  else
+    let baseId ← withFreshMacroScope (MonadQuotation.addMacroScope `__do_lift)
+    let (doElem, doElemsNew) ← (expandLiftMethodAux baseId false false doElem).run []
+    return (doElemsNew, doElem)
+
+@[term_elab «gdo»] def elabGDo : TermElab := fun stx expectedType? => do
+  tryPostponeIfNoneOrMVar expectedType?
+  let bindInfo ← extractBind expectedType?
+  let m ← Term.exprToSyntax bindInfo.m
+  let returnType ← Term.exprToSyntax bindInfo.returnType
+  let codeBlock ← Do.ToCodeBlock.run stx m returnType
+  let stxNew ← liftMacroM <| Do.ToTerm.run codeBlock.code m returnType
+  trace[Elab.gdo] stxNew
+  withMacroExpansion stx stxNew <| elabTermEnsuringType stxNew bindInfo.expectedType
+  --withMacroExpansion stx stxNew <| elabTermEnsuringType stxNew bindInfo.expectedType
+end test
+-/
+
 def test_lithium (A : @Atom PROP Nat) : @Li PROP _ Bool := do
+  let b ← exhale do
+    let n ← atom A
+    return (n == 1)
+  inhale do
+    let n ← atom A
+    prop (b = (n == 1))
+    return true
+
+def test_lithium2 (A : @Atom PROP Nat) : @Li PROP _ Bool := do
   (exhale <|
     atom A ≫= λ n =>
     .pure (n == 1)) ≫= λ b =>
@@ -251,10 +416,10 @@ namespace Iris.ProofMode
 open Lean Elab Tactic Meta Qq BI Std Lithium
 
 theorem inhale_own_tac [BI PROP] {P A : PROP} (E : Unit → PROP)
-  (h : P ∗ A ⊢ E ())
+  (_h : P ∗ A ⊢ E ())
  : P ⊢ (inhaleR (own A)) E := by
     simp [inhaleR, own]
-    sorry
+    mysorry
 
 @[irun_tac (inhaleR (own _)) _]
 def irunInhaleOwn : IRunTacticType := fun goal => do profileitM Exception "irunIntro" (← getOptions) do
@@ -278,10 +443,10 @@ def irunInhaleOwn : IRunTacticType := fun goal => do profileitM Exception "irunI
   return .some ((← goals.get).toList, [])
 
 theorem cancel [BI PROP] {p : Bool} {P P' A : PROP} {E}
-  (hP : P ⊣⊢ P' ∗ □?p A)
-  (h : P' ⊢ E ())
+  (_hP : P ⊣⊢ P' ∗ □?p A)
+  (_h : P' ⊢ E ())
  : P ⊢ exhaleR (own A) E := by
-   sorry
+   mysorry
 
 @[irun_tac exhaleR (own _) _]
 def irunCancel : IRunTacticType := fun goal => do profileitM Exception "irunCancel" (← getOptions) do
@@ -317,16 +482,16 @@ def irunDone : IRunTacticType := fun goal => do profileitM Exception "irunTrue" 
 
 
 theorem lif_true [BI PROP] {cond} {P : PROP} (E1 E2 : PROP)
-  (h1 : cond)
-  (h2 : P ⊢ E1)
+  (_h1 : cond)
+  (_h2 : P ⊢ E1)
  : P ⊢ lifR cond E1 E2 :=
-   sorry
+   by mysorry
 
 theorem lif_false [BI PROP] {cond} {P : PROP} (E1 E2 : PROP)
-  (h1 : ¬ cond)
-  (h2 : P ⊢ E2)
+  (_h1 : ¬ cond)
+  (_h2 : P ⊢ E2)
  : P ⊢ lifR cond E1 E2 :=
-   sorry
+   by mysorry
 
 syntax "istepsolve" : tactic
 macro_rules
@@ -376,25 +541,32 @@ def irunSimp : IRunTacticType := fun goal => do profileitM Exception "irunSimp" 
   return .some ([goal'], [])
 
 section test
-variable {u} [BI.{u} PROP]
+variable [BI.{u} PROP]
 
-theorem test1 (P : Nat → PROP) (Q : PROP) :
-  ⊢ ((inhale (own Q)).bind λ _ =>
-      inhale (own (P 1)) ≫
-      inhale (own (P 2)) ≫
-      inhale (own iprop(⌜1 = 1⌝)) ≫
-      exhale (own (P 1) ≫ own (P 2)) ≫
-      exhale (own Q) ≫
-     done).run empty := by
+example (P : Nat → PROP) (Q : PROP) :
+  ⊢ (do
+      inhale (own Q)
+      inhale (own (P 1))
+      inhale (own (P 2))
+      inhale (own iprop(⌜1 = 1⌝))
+      exhale do
+        own (P 1)
+        own (P 2)
+      exhale (own Q)
+      done).go := by
      istart
      simp [irun_preprocess]
      irun ∞
 
 
-theorem test_intro_cancel (P G : PROP) :
-  ⊢ (inhale ((own P) ≫ own G)).run λ _ =>
-     (exhale (own G)).run λ _ =>
-     done.run empty := by
+example (P G : PROP) :
+  ⊢ (do
+      inhale (PROP := PROP) do
+        own P
+        own G
+      exhale do
+        own G
+      done).go := by
     istart
     simp [irun_preprocess]
     irun 1
@@ -406,7 +578,7 @@ theorem test_intro_cancel (P G : PROP) :
 --set_option profiler true in
 --set_option profiler.threshold 1 in
 set_option maxRecDepth 30000 in
-#time theorem proof_cancel_3 (P : Nat → PROP) :
+#time example (P : Nat → PROP) :
   ⊢ (List.foldl (λ G n => inhaleR (own (P n)) λ _ => G)
     (List.foldl (λ G n => exhaleR (own (P n)) λ _ => G)
       (doneR) (
@@ -429,7 +601,7 @@ end Iris.ProofMode
 namespace Iris.Examples
 open Lang Lithium
 
-variable {u} [BI.{u} PROP]
+variable [BI.{u} PROP]
 
 /- Proof automation begins here -/
 
@@ -456,10 +628,11 @@ def fn_spec (v : Val) (G : Val → @Li PROP _ (Val → @Li PROP _ Empty)) : PROP
 def nat_okR (v : Val) (E : Nat → PROP) : PROP :=
   iprop(∃ n, ⌜v = .nat n⌝ ∗ E n)
 
+-- TODO: Make this an atom?
 @[irun_preprocess]
 def nat_ok (v : Val) : @Li PROP _ Nat := {
   run := nat_okR v
-  mono' E1 E2 := by sorry
+  mono' E1 E2 := by mysorry
 }
 
 def recv_okR (v : Val) (E : String → String → Exp → PROP) : PROP :=
@@ -468,7 +641,7 @@ def recv_okR (v : Val) (E : String → String → Exp → PROP) : PROP :=
 @[irun_preprocess]
 def recv_ok (v : Val) : @Li PROP _ (String × String × Exp) := {
   run E := recv_okR v λ f x e => E (f, x, e)
-  mono' E1 E2 := by sorry
+  mono' E1 E2 := by mysorry
 }
 
 def subst_okR (x : String) (v : Val) (e : Exp) (E : Exp → PROP) : PROP :=
@@ -479,7 +652,7 @@ def subst_ok (x : String) (v : Val) (e : Exp) : @Li PROP _ Exp := {
   run := subst_okR x v e
   mono' E1 E2 := by
     simp [subst_okR]
-    sorry
+    mysorry
 }
 
 @[irun]
@@ -508,58 +681,62 @@ theorem recv_okR_rec f x e (E : String → String → Exp -> PROP) :
 
 @[irun]
 theorem expr_okR_val v (E : Val -> PROP) :
-  expr_okR (.val v) E ⊣ E v := by sorry
+  expr_okR (.val v) E ⊣ E v := by mysorry
 
 @[irun]
-theorem expr_okR_plus e1 e2 (E : Val -> PROP) :
-  expr_okR (Exp.binop e1 .plus e2) E ⊣
-   expr_okR e1 λ v1 =>
-   expr_okR e2 λ v2 =>
-   nat_okR v1 λ n1 =>
-   nat_okR v2 λ n2 =>
-   dsimpR `irun_simp (n1 + n2) λ n =>
-   E (.nat n) := by sorry
+theorem expr_okR_plus e1 e2 :
+  expr_okR (PROP:=PROP) (Exp.binop e1 .plus e2) :- do
+   let n1 ← nat_ok (← expr_ok e1)
+   let n2 ← nat_ok (← expr_ok e2)
+   let n ← dsimp `irun_simp (n1 + n2)
+   return (Val.nat n) := by mysorry
 
 @[irun]
-theorem expr_okR_minus e1 e2 (E : Val -> PROP) :
-  expr_okR (Exp.binop e1 .minus e2) E ⊣
-   expr_okR e1 λ v1 =>
-   expr_okR e2 λ v2 =>
-   nat_okR v1 λ n1 =>
-   nat_okR v2 λ n2 =>
-   dsimpR `irun_simp (n1 - n2) λ n =>
-   E (.nat n) := by sorry
+theorem expr_okR_minus e1 e2 :
+  expr_okR (PROP:=PROP) (Exp.binop e1 .minus e2) :- do
+   let n1 ← nat_ok (← expr_ok e1)
+   let n2 ← nat_ok (← expr_ok e2)
+   let n ← dsimp `irun_simp (n1 - n2)
+   return (Val.nat n) := by mysorry
 
 @[irun]
-theorem expr_okR_eq e1 e2 (E : Val -> PROP) :
-  expr_okR (Exp.binop e1 .eq e2) E ⊣
-   expr_okR e1 λ v1 =>
-   expr_okR e2 λ v2 =>
-   nat_okR v1 λ n1 =>
-   nat_okR v2 λ n2 =>
-   dsimpR `irun_simp (if n1 == n2 then 1 else 0) λ n =>
-   E (.nat n) := by sorry
+theorem expr_okR_eq e1 e2 :
+  expr_okR (PROP:=PROP) (Exp.binop e1 .eq e2) :- do
+   let n1 ← nat_ok (← expr_ok e1)
+   let n2 ← nat_ok (← expr_ok e2)
+   let n ← dsimp `irun_simp (if n1 == n2 then 1 else 0)
+   return (Val.nat n)
+   := by mysorry
+
+-- @[irun]
+-- theorem expr_okR_eq e1 e2 (E : Val -> PROP) :
+--   expr_okR (Exp.binop e1 .eq e2) E ⊣
+--    expr_okR e1 λ v1 =>
+--    expr_okR e2 λ v2 =>
+--    nat_okR v1 λ n1 =>
+--    nat_okR v2 λ n2 =>
+--    dsimpR `irun_simp (if n1 == n2 then 1 else 0) λ n =>
+--    E (.nat n) := by mysorry
 
 @[irun]
 theorem expr_okR_rec f x e (E : Val -> PROP) :
-  expr_okR (.rece f x e) E ⊣ E (.recv f x e) := by sorry
+  expr_okR (.rece f x e) E ⊣ E (.recv f x e) := by mysorry
 
 @[irun]
-theorem expr_okR_app e1 e2 (E : Val -> PROP) :
-  expr_okR (.app e1 e2) E ⊣
-   expr_okR e2 λ v2 =>
-   expr_okR e1 λ v1 =>
-   recv_okR v1 λ f x e' =>
-   subst_okR x v2 e' λ e =>
-   subst_okR f (.recv f x e') e λ e =>
-   expr_okR e E := by sorry
+theorem expr_okR_app e1 e2 :
+  expr_okR (PROP:=PROP) (.app e1 e2) :- do
+   let v2 ← expr_ok e2
+   let ⟨f, x, e'⟩ ← recv_ok (← expr_ok e1)
+   let v ← expr_ok (← subst_ok f (.recv f x e') (← subst_ok x v2 e'))
+   return v
+  := by mysorry
 
 @[irun]
-theorem expr_okR_if e1 e2 e3 E :
-  (expr_okR (PROP:=PROP) e1 λ v1 =>
-   nat_okR v1 λ n1 =>
-   lifR (n1 ≠ 0) (expr_okR e2 E) (expr_okR e3 E)) ⊢
-  expr_okR (.ife e1 e2 e3) E := by sorry
+theorem expr_okR_if e1 e2 e3 :
+  expr_okR (.ife e1 e2 e3) :- (do
+    let n1 ← nat_ok (← expr_ok (PROP:=PROP) e1)
+    lif (n1 ≠ 0) (expr_ok e2) (expr_ok e3))
+   := by mysorry
 
 
 section
@@ -582,11 +759,12 @@ def irunSubst : IRunTacticType := fun goal => do profileitM Exception "irunSubst
 
 end
 
-theorem expr_okR_test (P : Val -> PROP) :
-  ⊢ (inhale (own (P (.nat 10)))).run λ _ =>
-     (expr_ok (.binop (.val (.nat 5)) .plus (.val (.nat 5)))).run λ v =>
-     (exhale (own (P v))).run λ _ =>
-     done.run empty := by
+example (P : Val -> PROP) :
+  ⊢ (do
+      inhale (own (P (.nat 10)))
+      let v ← expr_ok (.binop (.val (.nat 5)) .plus (.val (.nat 5)))
+      exhale (own (P v))
+      done).go := by
   istart
   simp [irun_preprocess]
   irun 1
@@ -602,13 +780,15 @@ theorem expr_okR_test (P : Val -> PROP) :
 
 attribute [irun_simp] Nat.add_one_sub_one
 
+-- time: ~1700ms
 set_option profiler true in
 --set_option profiler.threshold 1 in
-#time theorem expr_ok_test2 (P : Val -> PROP) :
-   ⊢ ((inhale (own (P (.nat 0)))) |>.bind λ _ =>
-      (expr_ok (.app (.val rec_fn) (.val (.nat 200)))) |>.bind λ v =>
-      (exhale (own (P v))) |>.bind λ _ =>
-      done).run empty := by
+#time example (P : Val -> PROP) :
+   ⊢ (do
+        inhale (own (P (.nat 0)))
+        let v ← expr_ok (.app (.val rec_fn) (.val (.nat 200)))
+        exhale (own (P v))
+        done).go := by
   istart
   unfold rec_fn
   simp [irun_preprocess]
