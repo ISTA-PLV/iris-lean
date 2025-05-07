@@ -550,13 +550,13 @@ def nat_ok (v : Val) : @LithiumM PROP _ Nat := {
   mono' E1 E2 := by sorry
 }
 
-def recv_ok (v : Val) : @LithiumM PROP _ (String × String × Exp) := {
+def recv_ok (v : Val) : @LithiumM PROP _ (Binder × Binder × Exp) := {
   run E := iprop(∃ f x e, ⌜v = .recv f x e⌝ ∗ E (f, x, e))
   mono' E1 E2 := by sorry
 }
 
-def subst_ok (x : String) (v : Val) (e : Exp) : @LithiumM PROP _ Exp := {
-  run E := E (subst x v e)
+def subst_ok (x : Binder) (v : Val) (e : Exp) : @LithiumM PROP _ Exp := {
+  run E := E (subst' x v e)
   mono' E1 E2 := by
     simp
     sorry
@@ -574,7 +574,7 @@ theorem nat_ok_nat (n : Nat) (E : Nat → PROP) :
   · iassumption
 
 @[irun]
-theorem recv_ok_rec f x e (E : (String × String × Exp) -> PROP) :
+theorem recv_ok_rec f x e (E : (Binder × Binder × Exp) -> PROP) :
   recv_ok (.recv f x e) ⇓ E ⊣ E (f, x, e) := by
   dsimp [recv_ok, LithiumM.run, LithiumM.run]
   iintro HP
@@ -655,10 +655,11 @@ def irunSubst : IRunTacticType := fun goal => do profileitM Exception "irunSubst
   let G' := G.getArg! 3
   let E := G.getArg! 4
   let .true := G'.isAppOfArity ``subst_ok 5 | return none
-  let .lit (.strVal x) := G'.getArg! 2 | return none
+  let some x := Reify.Binder.reify (G'.getArg! 2) | return none
   let v := G'.getArg! 3
   let e := Reify.reify (G'.getArg! 4)
-  let e' := (Reify.subst x v e).unreify
+  let e' := (Reify.subst' x v e).unreify
+--  logInfo m!"{repr x}, {G'.getArg! 2}, e': {e'}"
   let g' := {ig with goal := Expr.beta E #[e']}.toExpr
 --  let ⟨g', _⟩ ← goal.withContext (dsimpWithExt `irun_simp g')
   let goal' := ← goal.replaceTargetDefEq g'

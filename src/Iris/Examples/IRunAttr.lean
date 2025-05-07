@@ -19,10 +19,10 @@ def dsimpWithExt (ext_name : Name) (e : Expr) : MetaM (Expr × Simp.Stats) := do
   -- TODO: use simpprocs as well?
   Meta.dsimp e simpctx {}
 
-def simpWithExt (ext_name : Name) (e : Expr) : MetaM (Simp.Result × Simp.Stats) := do
+def simpWithExt (ext_name : Name) (e : Expr) (config := ({} : Simp.Config)) : MetaM (Simp.Result × Simp.Stats) := do
   let ext ← Lean.Meta.getSimpExtension? ext_name
   let theorems ← ext.get!.getTheorems
-  let simpctx := ← Simp.mkContext (simpTheorems := #[theorems])
+  let simpctx := ← Simp.mkContext (config:=config) (simpTheorems := #[theorems])
   Meta.simp e simpctx {}
 
 register_simp_attr irun_simp
@@ -64,12 +64,13 @@ initialize registerBuiltinAttribute {
   name := `irun
   descr := "irun lemma"
   add := fun decl stx kind => MetaM.run' do
-    let prio := if stx[2][0].isMissing then some irun_default_prio else stx[1][0].isNatLit?
-    let .some prio := prio | throwError "unknown prio: {stx[1][0]}"
+    let prio := if stx[2][0].isMissing then some irun_default_prio else stx[2][0].isNatLit?
+    let .some prio := prio | throwError "unknown prio: {stx[2][0]}"
     let declInfo ← getConstInfo decl
     let declTy := declInfo.type
     let (e, ty) ← forallTelescope declTy λ args ty => do
-      let (res, _) ← simpWithExt `irun_preprocess ty
+      -- we set iota to false since to reduces pattern matches on tuples to projections, which can cause weird effects
+      let (res, _) ← simpWithExt `irun_preprocess ty (config := {iota := false})
       let ty := res.expr
       return (← mkLambdaFVars args (← res.mkCast (mkAppN (← mkConstWithLevelParams decl) args)), ← mkForallFVars args ty)
     if !stx[1][0].isMissing then

@@ -52,16 +52,21 @@ partial def irunCore (nsteps : Option Nat) : TacticM Unit := do profileitM Excep
       repeat do
         let g ← instantiateMVars <| ← goal.getType
         let some #[prop, bi, P, G] := g.appM? ``Entails' | throwError "not in proof mode"
-        unless (← isMatcherApp G) do
-          break
-        match (← reduceRecMatcher? G) with
-        | some G' =>
+        if G.isHeadBetaTarget then
+          let G' := G.headBeta
+          let g' := mkApp4 (.const ``Entails' [g.getAppFn.constLevels![0]!])
+            prop bi P G'
+          goal.setType g'
+          progress_match := true
+          continue
+        if (← isMatcherApp G) then
+          let some G' ← reduceRecMatcher? G | throwError s!"Cannot reduce matcher at step {n}"
           let g' := mkApp4 (.const ``Entails' [g.getAppFn.constLevels![0]!])
             prop bi P G'
           goal := ← goal.replaceTargetDefEq g'
           progress_match := true
-          -- logInfo m!"AFTER REDUCE: {← goal.getType}"
-        | none    => throwError s!"Cannot reduce matcher at step {n}"
+          continue
+        break
 
     -- call dsimp on the goal, very expensive
     -- TODO: make this an option?

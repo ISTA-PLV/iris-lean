@@ -13,9 +13,14 @@ import Iris.Examples.Exp
 namespace Iris.ProofMode
 open Lean Elab Tactic Meta Qq BI Std
 
-@[irun]
+@[irun 5]
 theorem li_assoc_star.{u} {PROP : Type u} [BI PROP] {P1 P2 P3 : PROP}
  : P1 ∗ (P2 ∗ P3) ⊢ (P1 ∗ P2) ∗ P3 :=
+   sorry
+
+@[irun 5]
+theorem li_assoc_wand.{u} {PROP : Type u} [BI PROP] {P1 P2 P3 : PROP}
+ : (P1 -∗ P2 -∗ P3) ⊢ (P1 ∗ P2) -∗ P3 :=
    sorry
 
 axiom PROPTest : Type
@@ -193,12 +198,11 @@ theorem proof_intro_2 [BIAffine PROP] (P : Nat → PROP) :
 --set_option profiler.threshold 1 in
 set_option maxRecDepth 30000 in
 #time theorem proof_cancel_2 (P : Nat → PROP) :
-  ⊢ List.foldl (λ G n => iprop((P n) -∗ G))
+  ⊢ (List.foldl (λ G n => iprop((P n) ∗ G)) iprop(True) (List.range 200)) -∗
     (List.foldl (λ G n => iprop(P n ∗ G)) iprop(True) (
     -- List.reverse makes cancellation basically instant
     -- List.reverse
     (List.range 200)))
-    (List.range 200)
 :=
   by
     dsimp [List.foldl, List.range, List.range.loop, List.reverse]
@@ -217,8 +221,8 @@ open BI Lang
 variable {u} [BI.{u} PROP]
 
 def wpnat (v : Val) (P : Nat -> PROP) : PROP := iprop(∃ n, ⌜v = .nat n⌝ ∗ P n)
-def wprecv (v : Val) (P : String -> String -> Exp -> PROP) : PROP := iprop(∃ f x e, ⌜v = .recv f x e⌝ ∗ P f x e)
-def wpsubst (x : String) (v : Val) (e : Exp) (P : Exp -> PROP) : PROP := P (subst x v e)
+def wprecv (v : Val) (P : Binder -> Binder -> Exp -> PROP) : PROP := iprop(∃ f x e, ⌜v = .recv f x e⌝ ∗ P f x e)
+def wpsubst (x : Binder) (v : Val) (e : Exp) (P : Exp -> PROP) : PROP := P (subst' x v e)
 
 @[irun]
 theorem wpnat_nat (n : Nat) (P : Nat -> PROP) : P n ⊢ wpnat (.nat n) P := by
@@ -231,7 +235,7 @@ theorem wpnat_nat (n : Nat) (P : Nat -> PROP) : P n ⊢ wpnat (.nat n) P := by
   · iassumption
 
 @[irun]
-theorem wprecv_rec f x e (P : String -> String -> Exp -> PROP) : P f x e ⊢ wprecv (.recv f x e) P := by
+theorem wprecv_rec f x e (P : Binder -> Binder -> Exp -> PROP) : P f x e ⊢ wprecv (.recv f x e) P := by
   unfold wprecv
   iintro HP
   iexists _
@@ -304,11 +308,11 @@ def irunSubst : IRunTacticType := fun goal => do profileitM Exception "irunSubst
   let { prop:=_, bi:=_, e:=_, hyps:=_, goal:=G } := ig
 
   let .true := G.isAppOfArity ``wpsubst 5 | return none
-  let .lit (.strVal x) := G.getArg! 1 | return none
+  let some x := Reify.Binder.reify (G.getArg! 1) | return none
   let v := G.getArg! 2
   let P := G.getArg! 4
   let e := Reify.reify (G.getArg! 3)
-  let e' := (Reify.subst x v e).unreify
+  let e' := (Reify.subst' x v e).unreify
   let g' := {ig with goal := Expr.beta P #[e']}.toExpr
   let goal' := ← goal.replaceTargetDefEq g'
   return .some ([goal'], [])
