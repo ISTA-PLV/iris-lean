@@ -27,19 +27,15 @@ macro_rules
 
 /-
 Next steps:
-- add support for all
-- add support for inhale (atom A) by rewriting to a ← all; inhale (atom_with_ref A a)
-- add support for inhale (prop P)
-- add support for exhale (prop P)
-- add support for exhale (atom_with_ref A a) by rewriting to a' ← exhale (atom A); exhale (prop (a = a'))
-- add support for lif where one cannot prove either side
+- add shelving for not solvable goals
+- define a notation for the language
 - add subsumption for when atoms do not match up directly as in cancelation
-- look into function specifications
+- add support for inhale (atom A) by rewriting to a ← all; inhale (atom_with_ref A a)
+- add support for exhale (atom_with_ref A a) by rewriting to a' ← exhale (atom A); exhale (prop (a = a'))
 - define wp
 - add more lithium connectives
 - prove sorrys
 - do more examples
-- define a notation for the language
 - look into namespaces and using export
 -/
 
@@ -367,11 +363,20 @@ def irunInhaleProp : IRunTacticType := fun goal => do profileitM Exception "irun
     let pf := mkApp6 (.const ``inhale_prop_tac [u]) prop bi φ e E mbound
     goal.assign pf
     return m.mvarId!
+  let res ← try
+      let tac ← `(tactic|simp [*, irun_simp] at $(mkIdent n):ident)
+      evalTacticAtRaw tac m
+    catch _e =>
+      --logInfo m!"{e.toMessageData}"
+      .pure [m]
+  if res == [] then return .some ([], [])
+  let [m] := res | throwError "simp created too many subgoals"
   let mvars ← m.withContext do
-    -- TODO: when to we want to call cases?
-    unless φ.isEq || φ.isFalse || φ.isTrue do
-      return [m]
     let some d := (← getLCtx).findFromUserName? n | throwError "cannot find freshly generated name"
+    let ty := d.type
+    -- TODO: when to we want to call cases?
+    unless ty.isEq || ty.isFalse || ty.isTrue do
+      return [m]
     let r? ← observing? do
       let res ← m.cases d.fvarId
       return res.toList.map (·.mvarId)
@@ -969,17 +974,10 @@ theorem fib_ok [BIAffine PROP] :
   istart
   simp [irun_preprocess]
   irun
-  simp at *
-  irun
-  simp at *
-  irun
-  simp at *
   rename Nat => x
-  cases x
+  cases x using fib.fun_cases
   · irun
-  · rename Nat => x
-    cases x
-    · simp at *
-    · irun
+  · simp [*] at *
+  · irun
 
 end Iris.Examples
