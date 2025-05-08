@@ -88,6 +88,7 @@ instance : Monad (InEx PROP) where
 def atom (A : Atom PROP α) : InEx PROP α := InEx.mk A.ref
 def atom_with_ref (A : Atom PROP α) (a : α) : InEx PROP Unit := .mk λ _ => iprop(A.ref a)
 def prop (P : Prop) : InEx PROP Unit := .mk λ _ => iprop(⌜P⌝)
+def pers (L : InEx PROP α) : InEx PROP α := .mk λ a => iprop(□ L.body a)
 
 end InEx
 
@@ -223,6 +224,15 @@ def dualizing (G : Li PROP Empty) : Li PROP Unit := {
     iassumption
 }
 
+@[irun_preprocess]
+def fromEmpty (G : (Empty → PROP) → PROP) : Li PROP Empty where
+  run := G
+  mono' E1 E2 := by
+   have HE : (E1 = E2) := by ext x; nomatch x
+   simp [HE]
+   mysorry
+
+
 notation:25 P:29 "⊣" Q:25 => (Q ⊢ P)
 set_option quotPrecheck false in -- TODO: Why is this necessary?
 notation:25 P:29 ":-" Q:25 => (∀ E, Li.run Q E ⊢ P E)
@@ -307,6 +317,35 @@ def irunInhaleAtomWithRef : IRunTacticType := fun goal => do profileitM Exceptio
   goal.assign pf
   return .some ((← goals.get).toList, [])
 
+theorem inhale_pers_atom_with_ref_tac {α : Type _} [BI PROP] {P : PROP} (A : Atom PROP α) (a : α) (E : Unit → PROP)
+  (_h : P ∗ □ A.ref a ⊢ E ())
+ : P ⊢ (inhaleR (pers (atom_with_ref A a))) E := by
+    simp [inhaleR, atom_with_ref]
+    mysorry
+
+-- TODO: unify with irunInhaleAtomWithRef?
+@[irun_tac (inhaleR (pers (atom_with_ref _ _))) _]
+def irunInhalePersAtomWithRef : IRunTacticType := fun goal => do profileitM Exception "irunInhaleAtomWithRef" (← getOptions) do
+  let g ← instantiateMVars <| ← goal.getType
+  let some { u, prop, bi, e, hyps, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
+  let_expr inhaleR _ _ _ L E := G | return none
+  let_expr pers _ _ _ L := L | return none
+  let_expr atom_with_ref _ α A a := L | return none
+  let us := L.getAppFn.constLevels!
+  let ident ← `(binderIdent| _)
+  let goals ← IO.mkRef #[]
+  let Q := Expr.beta E #[mkConst ``Unit.unit]
+  let A' := mkApp4 (.const ``Atom.ref us) prop α A a
+  let A'' := mkApp3 (.const ``intuitionistically [u]) prop (mkApp2 (.const ``BI.toBIBase [u]) prop bi) A'
+  let pf ← iCasesCore bi hyps Q q(true) A'' A' ⟨⟩ (.one ident) fun hyps => do
+    let m ← mkFreshExprSyntheticOpaqueMVar <|
+      IrisGoal.toExpr { prop, bi, hyps, goal:=Q }
+    goals.modify (·.push m.mvarId!)
+    return m
+  let pf := mkApp8 (.const ``inhale_pers_atom_with_ref_tac us) prop α bi e A a E pf
+  goal.assign pf
+  return .some ((← goals.get).toList, [])
+
 theorem inhale_prop_tac [BI PROP] φ (P : PROP) E
   (_h : φ → P ⊢ E ())
  : P ⊢ inhaleR (prop φ) E := by
@@ -327,8 +366,17 @@ def irunInhaleProp : IRunTacticType := fun goal => do profileitM Exception "irun
     let mbound ← mkLambdaFVars #[x] m
     let pf := mkApp6 (.const ``inhale_prop_tac [u]) prop bi φ e E mbound
     goal.assign pf
-    return m
-  return .some ([m.mvarId!], [])
+    return m.mvarId!
+  let mvars ← m.withContext do
+    -- TODO: when to we want to call cases?
+    unless φ.isEq || φ.isFalse || φ.isTrue do
+      return [m]
+    let some d := (← getLCtx).findFromUserName? n | throwError "cannot find freshly generated name"
+    let r? ← observing? do
+      let res ← m.cases d.fvarId
+      return res.toList.map (·.mvarId)
+    return r?.elim [m] id
+  return .some (mvars, [])
 
 
 theorem cancel {α : Type _} [BI PROP] {p : Bool} {P P' : PROP} (A : Atom PROP α) (a : α) {E}
@@ -781,13 +829,16 @@ theorem prove_fn_ok α β v Gpre Gpost E :
    allR λ va =>
    allR λ v' =>
    allR λ Φ : Atom PROP α =>
-   inhaleR (atom_with_ref (fn_spec v') ⟨α, Gpre, λ a vr => (Gpost a vr).bind λ _ => done⟩) λ _ =>
+   inhaleR (pers (atom_with_ref (fn_spec v') ⟨α, Gpre, λ a vr => (Gpost a vr).bind λ _ => done⟩)) λ _ =>
    -- simpR `irun_preprocess true ((Gpre va).run) λ Gpre' =>
    ((Gpre va).run) |> λ Gpre' =>
    dualizingR (λ _ => Gpre' λ a => exhaleR (atom_with_ref Φ a) λ _ => doneR) λ _ =>
    recv_okR v λ f x e =>
    subst_okR x va e λ e =>
    subst_okR f v' e λ e =>
+   -- TODO make this something like app ok such that one can use
+   -- subtyping from other function specs? Needs care with the
+   -- recursive assumption
    expr_okR e λ vr =>
    exhaleR (atom Φ) λ a =>
    -- simpR `irun_preprocess true ((Gpost a vr).run) λ Gpost =>
@@ -805,6 +856,7 @@ theorem app_okR_spec v1 v2 :
    Li.pure vr
   := by mysorry
 
+/-
 theorem prove_fn_spec_inex {α : Type _} v Lpre Lpost :
   (fn_spec_inex (PROP:=PROP) v).ref ⟨α, Lpre, Lpost⟩ ⊣ (do
      all.bind λ va =>
@@ -827,6 +879,7 @@ theorem app_okR_inex v1 v2 :
    (inhale (Lpost a vr)).bind λ _ =>
    Li.pure vr
   := by mysorry
+-/
 
 @[irun]
 theorem dualizing_exhale α (L : InEx PROP α) (G : (Empty → PROP) → α → PROP) E :
@@ -844,18 +897,10 @@ theorem dualizing_inhale α (L : InEx PROP α) (G : (Empty → PROP) → α → 
 theorem dualizing_done E :
   dualizingR (PROP:=PROP) (λ _ => doneR) E ⊣ E () := by mysorry
 
-@[irun_preprocess]
-def Li.from_empty (G : (Empty → PROP) → PROP) : Li PROP Empty where
-  run := G
-  mono' E1 E2 := by
-   have HE : (E1 = E2) := by ext x; nomatch x
-   simp [HE]
-   mysorry
-
 @[irun]
 theorem dualizing_fn_ok α β E v Gpre Gpost (G : _ → _) :
   dualizingR (PROP:=PROP) (λ E => @fn_okR PROP _ α β v Gpre Gpost (G E)) E ⊣
-    inhaleR (atom_with_ref (fn_spec v) ⟨_, Gpre, λ a vr => (Gpost a vr).bind λ b => Li.from_empty (λ E => G E b)⟩) E
+    inhaleR (atom_with_ref (fn_spec v) ⟨_, Gpre, λ a vr => (Gpost a vr).bind λ b => fromEmpty (λ E => G E b)⟩) E
  := by mysorry
 
 example :
@@ -867,15 +912,13 @@ example :
   istart
   simp [irun_preprocess]
   irun
-  subst_eqs
-  irun
 
 def getc_fn : Val := .recv .anon .anon (.val (.nat 1))
 def putc_fn : Val := .recv .anon .anon (.val (.nat 1))
 def echo_fn : Val := .recv .anon .anon (.lete "x" (.app (.val getc_fn) (.val (.nat 0))) (.app (.val putc_fn) (.var "x")))
 def main_fn : Val := .recv .anon .anon (.app (.val echo_fn) (.val (.nat 0)))
 
-def echo_spec : PROP :=
+def echo_spec PROP [BI PROP] : PROP :=
   (fn_spec echo_fn).ref ⟨_,
      λ _ => do
       fn_ok getc_fn
@@ -887,7 +930,7 @@ def echo_spec : PROP :=
      λ vrp vr => do exhale (prop (vrp = vr)); done ⟩
 
 theorem echo_ok :
-  ⊢ @echo_spec PROP _ := by
+  ⊢ echo_spec PROP := by
   unfold echo_spec echo_fn
   apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
   istart
@@ -895,12 +938,48 @@ theorem echo_ok :
   irun
 
 theorem main_ok [BIAffine PROP] :
-  @echo_spec PROP _ ⊢ (fn_spec main_fn).ref ⟨_, λ _ => .pure (), λ _ vr => do exhale (prop (vr = .nat 1)); done⟩ := by
+  echo_spec PROP ⊢ (fn_spec main_fn).ref ⟨_, λ _ => .pure (), λ _ vr => do exhale (prop (vr = .nat 1)); done⟩ := by
   unfold echo_spec main_fn getc_fn putc_fn
   apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
   istart
   iintro x
   simp [irun_preprocess]
   irun
+
+def fib_fn : Val := .recv "f" "x" <|
+  .ife (.binop (.var "x") .eq (.val (.nat 0)))
+    (.val (.nat 0)) <|
+  .ife (.binop (.var "x") .eq (.val (.nat 1)))
+    (.val (.nat 1)) <|
+   .binop (.app (.var "f") (.binop (.var "x") .minus (.val (.nat 1)))) .plus
+     (.app (.var "f") (.binop (.var "x") .minus (.val (.nat 2))))
+
+@[irun_solve]
+def fib : Nat → Nat
+  | 0 => 0
+  | 1 => 1
+  | n+1+1 => fib (n + 1) + fib n
+
+theorem fib_ok [BIAffine PROP] :
+  ⊢ (fn_spec (PROP:=PROP) fib_fn).ref ⟨_,
+    λ va => do {let n ← exhale (natL va); exhale (prop (0 ≤ n)); return n},
+    λ n vr => do {let nr ← exhale (natL vr); exhale (prop (nr = fib n)); done}⟩ := by
+  unfold fib_fn
+  apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
+  istart
+  simp [irun_preprocess]
+  irun
+  simp at *
+  irun
+  simp at *
+  irun
+  simp at *
+  rename Nat => x
+  cases x
+  · irun
+  · rename Nat => x
+    cases x
+    · simp at *
+    · irun
 
 end Iris.Examples
