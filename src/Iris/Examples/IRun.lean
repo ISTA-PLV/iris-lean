@@ -26,6 +26,12 @@ next steps:
 namespace Iris.ProofMode
 open Lean Elab Tactic Meta Qq BI Std
 
+syntax "irunsolve" : tactic
+--macro_rules
+--  | `(tactic|irunsolve) => `(tactic|trivial)
+macro_rules
+  | `(tactic|irunsolve) => `(tactic|solve| simp [*, irun_solve])
+
 theorem irun_apply.{u} {PROP : Type u} [BI PROP] {P Q Q' : PROP}
   (h1 : Q' ⊢ Q)
   (h2 : P ⊢ Q')
@@ -96,11 +102,17 @@ partial def irunCore (nsteps : Option Nat) : TacticM Unit := do profileitM Excep
           let .some (Gnew, Gdecl) := (unpackEntails targetTy) | throwError "theorem is not entails, this should not happen"
           let .true ← isDefEq G Gdecl | continue
 
+          let mut do_cont := false
           for mvar in args do
             let mvarId := mvar.mvarId!
             if ! (← mvarId.isAssigned) && ! (← mvarId.isDelayedAssigned) then
-              -- TODO: try to solve all unsolved args using a tactic
-              throwError s!"[irun] argument with type `{← mvarId.getType}` of lemma {tac.name} not instantiated by unification"
+              try
+                let [] ← evalTacticAtRaw (← `(tactic|irunsolve)) mvarId | throwError "solver failed"
+              catch _e =>
+                -- logInfo m!"[irun] error '{_e.toMessageData}' when solving uninstantiated argument `{← instantiateMVars <| ← mvarId.getType}` of lemma {tac.name}"
+                do_cont := true
+                break
+          if do_cont then continue
 
           let m ← mkFreshExprSyntheticOpaqueMVar <|
             IrisGoal.toExpr { prop, bi, hyps := hyps, goal := Gnew }

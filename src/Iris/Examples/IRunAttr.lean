@@ -26,6 +26,7 @@ def simpWithExt (ext_name : Name) (e : Expr) (config := ({} : Simp.Config)) : Me
   Meta.simp e simpctx {}
 
 register_simp_attr irun_simp
+register_simp_attr irun_solve
 register_simp_attr irun_preprocess
 
 def IRunTacticType : Type := MVarId → TacticM (Option (List MVarId × List MVarId))

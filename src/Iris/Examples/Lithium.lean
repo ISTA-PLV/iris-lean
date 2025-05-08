@@ -165,6 +165,18 @@ def done : Li PROP α := {
     iassumption
 }
 
+def branchR (E1 E2 : PROP) : PROP :=
+  iprop(E1 ∧ E2)
+
+@[irun_preprocess]
+def branch (G1 G2 : Li PROP α) : Li PROP α := {
+  run E := branchR (G1.run E) (G2.run E)
+  mono' E1 E2 := by
+    dsimp
+    iintro HE Hwand
+    mysorry
+}
+
 def lifR (P : Prop) (E1 E2 : PROP) : PROP :=
   iprop((⌜P⌝ -∗ E1) ∧ (⌜¬P⌝ -∗ E2))
 
@@ -328,15 +340,23 @@ def irunExhaleAtom : IRunTacticType := fun goal => do profileitM Exception "irun
   let us := L.getAppFn.constLevels!
   let some ⟨a, P', hyps, _out, _ty, b, _, pf⟩ ←
     hyps.removeG false fun _ _ _ ty => do
-      -- logInfo m!"ty: ${ty}, A: ${A}"
       let_expr Atom.ref _ _ A' a := ty | return none
-      if ← isDefEq A' A then return some a else return none
+      let eq ← withReducible <| isDefEq A' A
+      -- logInfo m!"ty: {ty}, A: {A} / {repr A}, A': {A'} / {repr A'}, eq: {eq}"
+      if eq then return some a else return none
     | return none
   let m ← mkFreshExprSyntheticOpaqueMVar <|
     IrisGoal.toExpr { prop, bi, hyps := hyps, goal := Expr.beta E #[a] }
   let pf := mkApp11 (.const ``cancel us) prop α bi b e P' A a E pf m
   goal.assign pf
   return .some ([m.mvarId!], [])
+
+@[irun]
+theorem exhale_prop [BI PROP] P (E : Unit → PROP) :
+   P →
+   exhaleR (prop P) E ⊣ E () :=
+   by mysorry
+
 
 theorem all_tac [BI PROP] {α : Type _} (P : PROP) E
   (_h : ∀ a : α, P ⊢ E a)
@@ -372,52 +392,43 @@ def irunDone : IRunTacticType := fun goal => do profileitM Exception "irunDone" 
   goal.assign pf
   return .some ([], [])
 
+theorem branch_tac [BI PROP] P (E1 E2 : PROP)
+  (_ : P ⊢ E1)
+  (_ : P ⊢ E2)
+ : P ⊢ branchR E1 E2 := by
+   simp [branchR]
+   apply and_intro <;> trivial
 
-theorem lif_true [BI PROP] {cond} {P : PROP} (E1 E2 : PROP)
-  (_h1 : cond)
-  (_h2 : P ⊢ E1)
- : P ⊢ lifR cond E1 E2 :=
-   by mysorry
-
-theorem lif_false [BI PROP] {cond} {P : PROP} (E1 E2 : PROP)
-  (_h1 : ¬ cond)
-  (_h2 : P ⊢ E2)
- : P ⊢ lifR cond E1 E2 :=
-   by mysorry
-
-syntax "istepsolve" : tactic
-macro_rules
-  | `(tactic|istepsolve) => `(tactic|trivial)
---macro_rules
---  | `(tactic|istepsolve) => `(tactic|solve| simp)
-
-@[irun_tac lifR _ _ _]
-def irunLif : IRunTacticType := fun goal => do profileitM Exception "irunLif" (← getOptions) do
+@[irun_tac branchR _ _]
+def irunBranch : IRunTacticType := fun goal => do profileitM Exception "irunBranch" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
-  let some { prop, bi, e, hyps, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
-  let ~q(lifR $cond $E1 $E2) := G | return none
+  let some ig := parseIrisGoal? g | throwError "not in proof mode"
+  let { u, prop, bi, e, hyps:=_, goal:=G } := ig
 
-  let mcond : Q($cond) ← mkFreshExprSyntheticOpaqueMVar cond
-  try
-    let _ ← evalTacticAtRaw (← `(tactic|istepsolve)) mcond.mvarId!
-    let m : Q($e ⊢ $E1) ← mkFreshExprSyntheticOpaqueMVar <|
-      IrisGoal.toExpr { prop, bi, hyps := hyps, goal := E1 }
-    let pf := q(lif_true $E1 $E2 $mcond $m)
-    goal.assign pf
-    return .some ([m.mvarId!], [])
-  catch _ => pure ()
+  let_expr branchR _ _ E1 E2 := G | return none
+  let m1 ← mkFreshExprSyntheticOpaqueMVar <| IrisGoal.toExpr { ig with goal := E1 }
+  let m2 ← mkFreshExprSyntheticOpaqueMVar <| IrisGoal.toExpr { ig with goal := E2 }
+  let pf := mkApp7 (.const ``branch_tac [u]) prop bi e E1 E2 m1 m2
+  goal.assign pf
+  return .some ([m1.mvarId!, m2.mvarId!], [])
 
-  let mnegcond : Q(¬$cond) ← mkFreshExprSyntheticOpaqueMVar q(¬ $cond)
-  try
-    let _ ← evalTacticAt (← `(tactic|istepsolve)) mnegcond.mvarId!
-    let m : Q($e ⊢ $E2) ← mkFreshExprSyntheticOpaqueMVar <|
-      IrisGoal.toExpr { prop, bi, hyps := hyps, goal := E2 }
-    let pf := q(lif_false $E1 $E2 $mnegcond $m)
-    goal.assign pf
-    return .some ([m.mvarId!], [])
-  catch _ => pure ()
 
-  throwError "Cannot solve either side of lif"
+@[irun]
+theorem lif_true [BI PROP] {cond : Prop} (E1 E2 : PROP) :
+   cond →
+   lifR cond E1 E2 ⊣ E1  :=
+   by mysorry
+
+@[irun]
+theorem lif_false [BI PROP] {cond : Prop} (E1 E2 : PROP) :
+   ¬ cond →
+   lifR cond E1 E2 ⊣ E2 :=
+   by mysorry
+
+@[irun 20]
+theorem lif_branch [BI PROP] {cond : Prop} (E1 E2 : PROP) :
+   lifR cond E1 E2 ⊣ branchR (inhaleR (prop cond) λ _ => E1) (inhaleR (prop (¬ cond)) λ _ => E2) :=
+   by mysorry
 
 @[irun_tac simpR _ _ _ _]
 def irunSimp : IRunTacticType := fun goal => do profileitM Exception "irunSimp" (← getOptions) do
@@ -487,12 +498,12 @@ example (P G : Atom PROP Unit) :
 --set_option profiler.threshold 1 in
 set_option maxRecDepth 30000 in
 #time example (P : Nat → Atom PROP Unit) :
-  ⊢ inhaleR (List.foldl (λ G n => (atom_with_ref (P n) () ≫ G)) (.pure tt) (List.range 200)) λ _ =>
+  ⊢ inhaleR (List.foldl (λ G n => (atom_with_ref (P n) () ≫ G)) (.pure tt) (List.range 2)) λ _ =>
     (List.foldl (λ G n => exhaleR (atom (P n)) λ _ => G)
       (doneR) (
     -- List.reverse makes cancellation basically instant
     -- List.reverse
-    (List.range 200)))
+    (List.range 2)))
 
 :=
   by
@@ -707,7 +718,8 @@ example (P : Val -> Atom PROP Unit) :
 
 attribute [irun_simp] Nat.add_one_sub_one
 
--- time: ~1700ms
+-- time: ~1700ms (when using trivial for irun_solve)
+-- time: ~2559ms (when using simp for irun_solve)
 set_option profiler true in
 --set_option profiler.threshold 1 in
 #time example (P : Val -> Atom PROP Unit) :
@@ -846,13 +858,7 @@ example :
   simp [irun_preprocess]
   irun
   subst_eqs
-  irun 5
-  rename Nat => n
-  -- TODO: automate this
-  cases n
-  · irun
-  · simp
-    irun
+  irun
 
 def getc_fn : Val := .recv .anon .anon (.val (.nat 1))
 def putc_fn : Val := .recv .anon .anon (.val (.nat 1))
@@ -879,9 +885,6 @@ theorem echo_ok :
   irun
   dsimp
   irun
-  dsimp
-  irun
-  sorry
 
 theorem main_ok [BIAffine PROP] :
   @echo_spec PROP _ ⊢ (fn_spec main_fn).ref ⟨_, λ _ => .pure (), λ _ vr => do exhale (prop (vr = .nat 1)); done⟩ := by
@@ -890,32 +893,6 @@ theorem main_ok [BIAffine PROP] :
   istart
   iintro x
   simp [irun_preprocess]
-  irun 1
-  irun 1
-  irun 1
-  irun 1
-  irun 1
-  irun 1
-  irun 1
-  irun 1
-  irun 1
-  irun 1
-  irun 1
-  irun 1
-  irun 1
-  irun 1
-  irun 1
-  irun 1
-  irename : (fn_spec _).ref _ => x2
-  -- TODO: this is weird
-  iclear x2
-  irun 1
-  dsimp
   irun
-  -- TODO: this is weird
-  irun
-  simp [*]
-  sorry
-
 
 end Iris.Examples

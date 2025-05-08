@@ -74,7 +74,7 @@ def irunCancel : IRunTacticType := fun goal => do profileitM Exception "irunCanc
   let some ⟨_inst, P', hyps, out, ty, b, _, pf⟩ ←
     hyps.removeG false fun _ _ _ ty => do
       -- logInfo m!"ty: ${ty}, A: ${A}"
-      if ← isDefEq ty A then return some ty else return none
+      if ← withReducible <| isDefEq ty A then return some ty else return none
     | return none
   have : $ty =Q $A := ⟨⟩
   have : $out =Q iprop(□?$b $ty) := ⟨⟩
@@ -99,51 +99,17 @@ def irunTrue : IRunTacticType := fun goal => do profileitM Exception "irunTrue" 
 def lif [BI PROP] (cond : Prop) (P1 P2 : PROP) : PROP :=
   iprop((⌜cond⌝ -∗ P1) ∧ (⌜¬cond⌝ -∗ P2))
 
-theorem lif_true [BI PROP] {cond} {P P1 P2 : PROP}
-  (h1 : cond)
-  (h2 : P ⊢ P1)
- : P ⊢ lif cond P1 P2 :=
-   sorry
+@[irun]
+theorem lif_true [BI PROP] {cond : Prop} (E1 E2 : PROP) :
+   cond →
+   E1 ⊢ lif cond E1 E2 :=
+   by sorry
 
-theorem lif_false [BI PROP] {cond} {P P1 P2 : PROP}
-  (h1 : ¬ cond)
-  (h2 : P ⊢ P2)
- : P ⊢ lif cond P1 P2 :=
-   sorry
-
-syntax "istepsolve" : tactic
-macro_rules
-  | `(tactic|istepsolve) => `(tactic|trivial)
---macro_rules
---  | `(tactic|istepsolve) => `(tactic|solve| simp)
-
-@[irun_tac lif _ _ _]
-def irunLif : IRunTacticType := fun goal => do profileitM Exception "irunLif" (← getOptions) do
-  let g ← instantiateMVars <| ← goal.getType
-  let some { prop, bi, e, hyps, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
-  let ~q(iprop(lif $cond $P1 $P2)) := G | return none
-
-  let mcond : Q($cond) ← mkFreshExprSyntheticOpaqueMVar cond
-  try
-    let _ ← evalTacticAtRaw (← `(tactic|istepsolve)) mcond.mvarId!
-    let m : Q($e ⊢ $P1) ← mkFreshExprSyntheticOpaqueMVar <|
-      IrisGoal.toExpr { prop, bi, hyps := hyps, goal := P1 }
-    let pf := q(lif_true (P2:=$P2) $mcond $m)
-    goal.assign pf
-    return .some ([m.mvarId!], [])
-  catch _ => pure ()
-
-  let mnegcond : Q(¬$cond) ← mkFreshExprSyntheticOpaqueMVar q(¬ $cond)
-  try
-    let _ ← evalTacticAt (← `(tactic|istepsolve)) mnegcond.mvarId!
-    let m : Q($e ⊢ $P2) ← mkFreshExprSyntheticOpaqueMVar <|
-      IrisGoal.toExpr { prop, bi, hyps := hyps, goal := P2 }
-    let pf := q(lif_false (P1:=$P1) $mnegcond $m)
-    goal.assign pf
-    return .some ([m.mvarId!], [])
-  catch _ => pure ()
-
-  throwError "Cannot solve either side of lif"
+@[irun]
+theorem lif_false [BI PROP] {cond : Prop} (E1 E2 : PROP) :
+   ¬ cond →
+   E2 ⊢ lif cond E1 E2 :=
+   by sorry
 
 def wpsimp {α : Type _} [BI PROP] (_ : Lean.Name) (a : α) (P : α -> PROP) : PROP := P a
 
