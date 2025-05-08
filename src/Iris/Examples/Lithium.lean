@@ -418,6 +418,24 @@ theorem exhale_prop [BI PROP] P (E : Unit → PROP) :
    exhaleR (prop P) E ⊣ E () :=
    by mysorry
 
+theorem exhale_prop_tac [BI PROP] (P : PROP) (φ : Prop) E
+  (_hφ : φ)
+  (_h : P ⊢ E ())
+ : P ⊢ exhaleR (prop φ) E := by
+   mysorry
+
+@[irun_tac 20 | exhaleR (prop _) _]
+def irunExhaleProp : IRunTacticType := fun goal => do profileitM Exception "irunExhaleProp" (← getOptions) do
+  let g ← instantiateMVars <| ← goal.getType
+  let some { u, prop, bi, e, hyps, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
+  let_expr exhaleR _ _ _ L E := G | return none
+  let_expr prop _ _ P := L | return none
+  let mP ← mkFreshExprSyntheticOpaqueMVar P
+  let m ← mkFreshExprSyntheticOpaqueMVar <|
+      IrisGoal.toExpr { prop, bi, hyps, goal := Expr.beta E #[mkConst ``Unit.unit] }
+  let pf := mkApp7 (.const ``exhale_prop_tac [u]) prop bi e P E mP m
+  goal.assign pf
+  return .some ([m.mvarId!], [mP.mvarId!])
 
 theorem all_tac [BI PROP] {α : Type _} (P : PROP) E
   (_h : ∀ a : α, P ⊢ E a)
@@ -963,7 +981,7 @@ def fib_fn : Val := .recv "f" "x" <|
 def fib : Nat → Nat
   | 0 => 0
   | 1 => 1
-  | n+1+1 => fib (n + 1) + fib n
+  | n+1+1 => fib n + fib (n + 1)
 
 theorem fib_ok [BIAffine PROP] :
   ⊢ (fn_spec (PROP:=PROP) fib_fn).ref ⟨_,
@@ -974,10 +992,8 @@ theorem fib_ok [BIAffine PROP] :
   istart
   simp [irun_preprocess]
   irun
-  rename Nat => x
-  cases x using fib.fun_cases
-  · irun
-  · simp [*] at *
-  · irun
+  · rename Nat => x
+    cases x using fib.fun_cases <;> simp [fib] at * <;> omega
+
 
 end Iris.Examples

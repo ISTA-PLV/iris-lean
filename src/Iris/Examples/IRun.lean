@@ -45,9 +45,13 @@ theorem irun_apply.{u} {PROP : Type u} [BI PROP] {P Q Q' : PROP}
 --def profileitM (_ : Type) (_ : String) (_ : Options) (act : TacticM α) : TacticM α := act
 partial def irunCore (config : IRunConfig) (nsteps : Option Nat) : TacticM Unit := do profileitM Exception "irun" (← getOptions) do
   -- TODO: keep track of [IrisGoal]s instead of just MVars such that tactics can avoid reparsing
-  let mut goals ← getGoals
+  let mut (goals, shelved) ← (← getGoals).partitionM λ m => do
+    -- if config.debug then logInfo m!"goal: {repr (← m.getType)}"
+    return (← m.getType).isAppOf ``Entails'
+  -- if config.debug then
+  --   logInfo m!"goals: {goals}"
+  --   logInfo m!"shelved: {shelved}"
   let mut n := 0
-  let mut shelved := []
   repeat
     if nsteps == some n then
       break
