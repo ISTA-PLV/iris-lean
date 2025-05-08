@@ -58,13 +58,18 @@ structure InEx (PROP : Type u) (α : Type v) where
   body : α → PROP
 
 structure Li (PROP : Type u) [BI.{u} PROP] (α : Type v) where
-  run' : (α → PROP) → PROP
-  mono' E1 E2 : ⊢ run' E1 -∗ (∀ a, E1 a -∗ E2 a) -∗ run' E2
+  run : (α → PROP) → PROP
+  mono' E1 E2 : ⊢ run E1 -∗ (∀ a, E1 a -∗ E2 a) -∗ run E2
+
+-- This prevents printing mono := ...
+-- TODO: Is this a good idea?
+delab_rule Li.mk
+  | `($_ $run $_) => do ``($run)
 
 -- make Li.run semireducible instead of a projection that is always reduced
 -- TODO: Do we want this?
-def Li.run := @Li.run'
-attribute [irun_preprocess] Li.run
+--def Li.run := @Li.run'
+--attribute [irun_preprocess] Li.run
 
 
 section InEx
@@ -88,7 +93,7 @@ end InEx
 
 @[irun_preprocess]
 def Li.pure (a : α) : Li PROP α := {
-  run' E := E a
+  run E := E a
   mono' E1 E2 := by
     dsimp
     iintro HE Hwand
@@ -99,7 +104,7 @@ def Li.pure (a : α) : Li PROP α := {
 @[irun_preprocess]
 def Li.bind (G1 : Li PROP α) (G2 : α → Li PROP β) :
   Li PROP β := {
-  run' E := G1.run (λ a => (G2 a).run E)
+  run E := G1.run (λ a => (G2 a).run E)
   mono' E1 E2 := by
     dsimp
     iintro HE Hwand
@@ -120,7 +125,7 @@ def exhaleR (L : InEx PROP α) (E : α → PROP) : PROP :=
 
 @[irun_preprocess]
 def exhale (L : InEx PROP α) : Li PROP α := {
-  run' := exhaleR L
+  run := exhaleR L
   mono' E1 E2 := by
     dsimp [exhaleR]
     iintro ⟨a, HL, HE⟩ Hwand
@@ -136,7 +141,7 @@ def inhaleR (L : InEx PROP α) (E : α → PROP) : PROP :=
 
 @[irun_preprocess]
 def inhale (L : InEx PROP α) : Li PROP α := {
-  run' := inhaleR L
+  run := inhaleR L
   mono' E1 E2 := by
     dsimp [inhaleR]
     iintro HE Hwand a HL
@@ -150,7 +155,7 @@ def allR {α : Type v} (E : α → PROP) : PROP :=
 
 @[irun_preprocess]
 def all {α : Type v} : Li PROP α := {
-  run' := @allR _ _ α
+  run := @allR _ _ α
   mono' E1 E2 := by
     dsimp [allR]
     iintro HE Hwand a
@@ -163,7 +168,7 @@ def doneR : PROP := iprop(True)
 
 @[irun_preprocess]
 def done : Li PROP α := {
-  run' E := doneR
+  run E := doneR
   mono' E1 E2 := by
     dsimp [doneR]
     iintro HE Hwand
@@ -175,7 +180,7 @@ def branchR (E1 E2 : PROP) : PROP :=
 
 @[irun_preprocess]
 def branch (G1 G2 : Li PROP α) : Li PROP α := {
-  run' E := branchR (G1.run E) (G2.run E)
+  run E := branchR (G1.run E) (G2.run E)
   mono' E1 E2 := by
     dsimp
     iintro HE Hwand
@@ -187,7 +192,7 @@ def lifR (P : Prop) (E1 E2 : PROP) : PROP :=
 
 @[irun_preprocess]
 def lif (P : Prop) (G1 G2 : Li PROP α) : Li PROP α := {
-  run' E := lifR P (G1.run E) (G2.run E)
+  run E := lifR P (G1.run E) (G2.run E)
   mono' E1 E2 := by
     dsimp
     iintro HE Hwand
@@ -198,7 +203,7 @@ def simpR {α : Type _} [BI PROP] (_ : Lean.Name) (_dsimp : Bool) (a : α) (E : 
 
 @[irun_preprocess]
 def simp {α : Type _} [BI PROP] (n : Lean.Name) (dsimp : Bool) (a : α) : Li PROP α := {
-  run' := simpR n dsimp a
+  run := simpR n dsimp a
   mono' E1 E2 := by
     simp [simpR]
     mysorry
@@ -209,7 +214,7 @@ def dualizingR (G : (Empty → PROP) → PROP) (E : Unit → PROP) : PROP :=
 
 @[irun_preprocess]
 def dualizing (G : Li PROP Empty) : Li PROP Unit := {
-  run' := dualizingR G.run
+  run := dualizingR G.run
   mono' E1 E2 := by
     dsimp [dualizingR]
     iintro HE Hwand HG
@@ -532,7 +537,7 @@ def expr_okR := @wp PROP _
 
 @[irun_preprocess]
 def expr_ok (e : Exp) : Li PROP Val := {
-  run' := expr_okR e
+  run := expr_okR e
   mono' := wp_wand e
 }
 
@@ -540,7 +545,7 @@ def app_okR (v1 v2 : Val) : (Val → PROP) → PROP := expr_okR (.app (.val v1) 
 
 @[irun_preprocess]
 def app_ok (v1 v2 : Val) : Li PROP Val := {
-  run' := app_okR v1 v2
+  run := app_okR v1 v2
   mono' := wp_wand (.app (.val v1) (.val v2))
 }
 
@@ -561,7 +566,7 @@ def recv_okR (v : Val) (E : Binder → Binder → Exp → PROP) : PROP :=
 
 @[irun_preprocess]
 def recv_ok (v : Val) : Li PROP (Binder × Binder × Exp) := {
-  run' E := recv_okR v λ f x e => E (f, x, e)
+  run E := recv_okR v λ f x e => E (f, x, e)
   mono' E1 E2 := by mysorry
 }
 
@@ -570,7 +575,7 @@ def subst_okR (x : Binder) (v : Val) (e : Exp) (E : Exp → PROP) : PROP :=
 
 @[irun_preprocess]
 def subst_ok (x : Binder) (v : Val) (e : Exp) : Li PROP Exp := {
-  run' := subst_okR x v e
+  run := subst_okR x v e
   mono' E1 E2 := by
     simp [subst_okR]
     mysorry
@@ -759,7 +764,7 @@ def fn_okR {α β : Type _} (v : Val) (Gpre : Val → Li PROP α) (Gpost : α �
 
 @[irun_preprocess]
 def fn_ok {α β : Type _} (v : Val) (Gpre : Val → Li PROP α) (Gpost : α → Val → Li PROP β) : Li PROP β where
-  run' := fn_okR v Gpre Gpost
+  run := fn_okR v Gpre Gpost
   mono' E1 E2 := by mysorry
 
 def fn_spec_inex (v : Val) : Atom PROP ((α : Type w) × (Val → InEx PROP α) × (α → Val → InEx PROP Unit)) :=
@@ -777,14 +782,16 @@ theorem prove_fn_ok α β v Gpre Gpost E :
    allR λ v' =>
    allR λ Φ : Atom PROP α =>
    inhaleR (atom_with_ref (fn_spec v') ⟨α, Gpre, λ a vr => (Gpost a vr).bind λ _ => done⟩) λ _ =>
-   simpR `irun_preprocess true ((Gpre va).run) λ Gpre' =>
+   -- simpR `irun_preprocess true ((Gpre va).run) λ Gpre' =>
+   ((Gpre va).run) |> λ Gpre' =>
    dualizingR (λ _ => Gpre' λ a => exhaleR (atom_with_ref Φ a) λ _ => doneR) λ _ =>
    recv_okR v λ f x e =>
    subst_okR x va e λ e =>
    subst_okR f v' e λ e =>
    expr_okR e λ vr =>
    exhaleR (atom Φ) λ a =>
-   simpR `irun_preprocess true ((Gpost a vr).run) λ Gpost =>
+   -- simpR `irun_preprocess true ((Gpost a vr).run) λ Gpost =>
+   ((Gpost a vr).run) |> λ Gpost =>
    Gpost E := by mysorry
 
 -- should be applied after the inlining rule
@@ -839,7 +846,7 @@ theorem dualizing_done E :
 
 @[irun_preprocess]
 def Li.from_empty (G : (Empty → PROP) → PROP) : Li PROP Empty where
-  run' := G
+  run := G
   mono' E1 E2 := by
    have HE : (E1 = E2) := by ext x; nomatch x
    simp [HE]
@@ -885,8 +892,6 @@ theorem echo_ok :
   apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
   istart
   simp [irun_preprocess]
-  irun
-  dsimp
   irun
 
 theorem main_ok [BIAffine PROP] :

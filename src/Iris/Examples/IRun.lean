@@ -26,6 +26,11 @@ next steps:
 namespace Iris.ProofMode
 open Lean Elab Tactic Meta Qq BI Std
 
+structure IRunConfig where
+  debug := false
+
+declare_config_elab elabIRunConfig IRunConfig
+
 syntax "irunsolve" : tactic
 --macro_rules
 --  | `(tactic|irunsolve) => `(tactic|trivial)
@@ -38,7 +43,7 @@ theorem irun_apply.{u} {PROP : Type u} [BI PROP] {P Q Q' : PROP}
  : P ⊢ Q := h2.trans h1
 
 --def profileitM (_ : Type) (_ : String) (_ : Options) (act : TacticM α) : TacticM α := act
-partial def irunCore (nsteps : Option Nat) : TacticM Unit := do profileitM Exception "irun" (← getOptions) do
+partial def irunCore (config : IRunConfig) (nsteps : Option Nat) : TacticM Unit := do profileitM Exception "irun" (← getOptions) do
   -- TODO: keep track of [IrisGoal]s instead of just MVars such that tactics can avoid reparsing
   let mut goals ← getGoals
   let mut n := 0
@@ -55,16 +60,18 @@ partial def irunCore (nsteps : Option Nat) : TacticM Unit := do profileitM Excep
     -- reduce matches, very cheap
     -- TODO: make this an option?
     if true then
-/-
+
       -- TODO: do we want this?
       let g ← instantiateMVars <| ← goal.getType
       let some #[prop, bi, P, G] := g.appM? ``Entails' | throwError "not in proof mode"
       let G' ← whnfR G
       let g' := mkApp4 (.const ``Entails' [g.getAppFn.constLevels![0]!]) prop bi P G'
-      goal := ← goal.replaceTargetDefEq g'
+      -- TODO: alternatively, we can do goal.setType g'. Does this make a difference?
       progress_match := G != G'
-      logInfo m!"G: {G}, G': {G}"
--/
+      if progress_match then
+        goal := ← goal.replaceTargetDefEq g'
+      if config.debug then logInfo m!"progress: {progress_match}, G: {G}, G': {G'}"
+/-
       repeat do
         let g ← instantiateMVars <| ← goal.getType
         let some #[prop, bi, P, G] := g.appM? ``Entails' | throwError "not in proof mode"
@@ -83,6 +90,7 @@ partial def irunCore (nsteps : Option Nat) : TacticM Unit := do profileitM Excep
           progress_match := true
           continue
         break
+-/
 
     -- call dsimp on the goal, very expensive
     -- TODO: make this an option?
@@ -95,6 +103,7 @@ partial def irunCore (nsteps : Option Nat) : TacticM Unit := do profileitM Excep
     let (progress, goals'', shelved') ← goal.withContext do
       let mut g ← instantiateMVars <| ← goal.getType
       let some { u, prop, bi, e, hyps, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
+      if config.debug then logInfo m!"Goal: {G}"
       -- logInfo m!"IN LOOP: {G}"
       let tree := irunExt.getState (← getEnv)
       let G ← instantiateExprMVars G
@@ -102,7 +111,7 @@ partial def irunCore (nsteps : Option Nat) : TacticM Unit := do profileitM Excep
       let tacs ← tree.getMatch G
       let tacs := tacs.insertionSort λ a b => a.prio < b.prio
       for tac in tacs do
-        -- logInfo m!"trying {tac.name}"
+        if config.debug then logInfo m!"trying {tac.name}"
         match tac.tac with
         | .inl decl =>
           let info ← getConstInfo decl
@@ -118,8 +127,9 @@ partial def irunCore (nsteps : Option Nat) : TacticM Unit := do profileitM Excep
             if ! (← mvarId.isAssigned) && ! (← mvarId.isDelayedAssigned) then
               try
                 let [] ← evalTacticAtRaw (← `(tactic|irunsolve)) mvarId | throwError "solver failed"
-              catch _e =>
-                -- logInfo m!"[irun] error '{_e.toMessageData}' when solving uninstantiated argument `{← instantiateMVars <| ← mvarId.getType}` of lemma {tac.name}"
+              catch e =>
+                if config.debug then
+                  logInfo m!"[irun] error '{e.toMessageData}' when solving uninstantiated argument `{← instantiateMVars <| ← mvarId.getType}` of lemma {tac.name}"
                 do_cont := true
                 break
           if do_cont then continue
@@ -134,6 +144,7 @@ partial def irunCore (nsteps : Option Nat) : TacticM Unit := do profileitM Excep
           return (true, goals_new++goals', shelved++shelved_new)
       return (false, goal::goals', shelved)
     if !progress && !progress_match then
+      if config.debug then logInfo m!"no progress, exiting"
       break
     n := n+1
     goals := goals''
@@ -143,12 +154,12 @@ partial def irunCore (nsteps : Option Nat) : TacticM Unit := do profileitM Excep
     logInfo s!"Did {n} steps"
   setGoals (goals ++ shelved)
 
-elab "irun" : tactic => do
-  irunCore none
+elab "irun" cfg:Parser.Tactic.optConfig : tactic => do
+  irunCore (← elabIRunConfig cfg) none
 
-elab "irun" colGt nsteps:num : tactic => do
-  irunCore (some nsteps.getNat)
+elab "irun" cfg:Parser.Tactic.optConfig colGt nsteps:num : tactic => do
+  irunCore (← elabIRunConfig cfg) (some nsteps.getNat)
 
-elab "irun" colGt "∞" : tactic => do
+elab "irun" cfg:Parser.Tactic.optConfig colGt "∞" : tactic => do
   -- this number is sufficiently close to infinity for our purposes
-  irunCore (some 100000)
+  irunCore (← elabIRunConfig cfg) (some 100000)
