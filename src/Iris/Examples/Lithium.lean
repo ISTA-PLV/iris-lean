@@ -201,32 +201,9 @@ def dualizing (G : Li PROP Empty) : Li PROP Unit := {
     iassumption
 }
 
----- TODO: What are good precedences?
---notation:35 G:36 " ⇓ " E:35 => run G E
---notation:35 G:36 " ⇓ " "!" => run G empty
-
---def entails (G1 G2 : Li PROP α) : Prop :=
---  ∀ E, G1.run E ⊢ G2.run E
-
---notation:25 G1:29 ":-" G2:25 => (entails G2 G1)
---set_option quotPrecheck false in -- TODO: Why is this necessary?
---notation:25 G1:29 ":-" G2:25 => (∀ E, (G2 ⇓ E ⊢ G1 ⇓ E))
 notation:25 P:29 "⊣" Q:25 => (Q ⊢ P)
 set_option quotPrecheck false in -- TODO: Why is this necessary?
 notation:25 P:29 ":-" Q:25 => (∀ E, Li.run Q E ⊢ P E)
-
---notation:25 G1:29 ":-" G2:25 => (run! G2 ⊢ run! G1)
-
--- @[irun]
--- theorem run_bind (G1 : Li PROP α) (G2 : α → Li β)
---   (E : β → PROP) :
---    G1.bind G2 ⇓ E ⊣ (G1 ⇓ λ b => G2 b ⇓ E) := by
---     simp [Li.bind, Li.run, Li.run]
-
--- @[irun]
--- theorem run_pure (a : α) (E : α → PROP) :
---    .pure a ⇓ E ⊣ E a := by
---     simp [Li.pure, Li.run, Li.run]
 
 attribute [irun_preprocess] Li.run
 
@@ -256,146 +233,10 @@ theorem inhale_pure (a : α) E :
     dsimp [inhaleR, InEx.pure]
     mysorry
 
-
---set_option pp.universes true
-
 def test_inex (A : Atom PROP Nat) : InEx PROP Bool :=
   atom A ≫= λ n =>
   atom_with_ref A n ≫
   .pure (n == 1)
-
-/-
-section test
-open Elab Term Lean.Parser.Term Parser
-
-syntax (name := gdo) "gdo" doSeq:term
-
-private def liftMethodDelimiter (k : SyntaxNodeKind) : Bool :=
-  k == ``Lithium.gdo ||
-  k == ``Parser.Term.do ||
-  k == ``Parser.Term.doSeqIndent ||
-  k == ``Parser.Term.doSeqBracketed ||
-  k == ``Parser.Term.termReturn ||
-  k == ``Parser.Term.termUnless ||
-  k == ``Parser.Term.termTry ||
-  k == ``Parser.Term.termFor
-
-private def getDoSeqElems (doSeq : Syntax) : List Syntax :=
-  if doSeq.getKind == ``Parser.Term.doSeqBracketed then
-    doSeq[1].getArgs.toList.map fun arg => arg[0]
-  else if doSeq.getKind == ``Parser.Term.doSeqIndent then
-    doSeq[0].getArgs.toList.map fun arg => arg[0]
-  else
-    []
-
-private def getDoSeq (doStx : Syntax) : Syntax :=
-  doStx[1]
-
-
-/-- Given `stx` which is a `letPatDecl`, `letEqnsDecl`, or `letIdDecl`, return true if it has binders. -/
-private def letDeclArgHasBinders (letDeclArg : Syntax) : Bool :=
-  let k := letDeclArg.getKind
-  if k == ``Parser.Term.letPatDecl then
-    false
-  else if k == ``Parser.Term.letEqnsDecl then
-    true
-  else if k == ``Parser.Term.letIdDecl then
-    -- letIdLhs := binderIdent >> checkWsBefore "expected space before binders" >> many (ppSpace >> letIdBinder)) >> optType
-    let binders := letDeclArg[1]
-    binders.getNumArgs > 0
-  else
-    false
-
-/-- Return `true` if the given `letDecl` contains binders. -/
-private def letDeclHasBinders (letDecl : Syntax) : Bool :=
-  letDeclArgHasBinders letDecl[0]
-
-private def liftMethodForbiddenBinder (stx : Syntax) : Bool :=
-  let k := stx.getKind
-  -- TODO: make this extensible in the future.
-  if k == ``Parser.Term.fun || k == ``Parser.Term.matchAlts ||
-     k == ``Parser.Term.doLetRec || k == ``Parser.Term.letrec then
-     -- It is never ok to lift over this kind of binder
-    true
-  -- The following kinds of `let`-expressions require extra checks to decide whether they contain binders or not
-  else if k == ``Parser.Term.let then
-    letDeclHasBinders stx[1]
-  else if k == ``Parser.Term.doLet then
-    letDeclHasBinders stx[2]
-  else if k == ``Parser.Term.doLetArrow then
-    letDeclArgHasBinders stx[2]
-  else
-    false
-
-private partial def hasLiftMethod : Syntax → Bool
-  | Syntax.node _ k args =>
-    if liftMethodDelimiter k then false
-    -- NOTE: We don't check for lifts in quotations here, which doesn't break anything but merely makes this rare case a
-    -- bit slower
-    else if k == ``Parser.Term.liftMethod then true
-    -- For `pure` if-then-else, we only lift `(<- ...)` occurring in the condition.
-    else if k == ``termDepIfThenElse || k == ``termIfThenElse then args.size >= 2 && hasLiftMethod args[1]!
-    else args.any hasLiftMethod
-  | _ => false
-
-variable (baseId : Name) in
-private partial def expandLiftMethodAux (inQuot : Bool) (inBinder : Bool) : Syntax → StateT (List Syntax) TermElabM Syntax
-  | stx@(Syntax.node i k args) =>
-    if k == choiceKind then do
-      -- choice node: check that lifts are consistent
-      let alts ← stx.getArgs.mapM (expandLiftMethodAux inQuot inBinder · |>.run [])
-      let (_, lifts) := alts[0]!
-      unless alts.all (·.2 == lifts) do
-        throwErrorAt stx "cannot lift `(<- ...)` over inconsistent syntax variants, consider lifting out the binding manually"
-      modify (· ++ lifts)
-      return .node i k (alts.map (·.1))
-    else if liftMethodDelimiter k then
-      return stx
-    -- For `pure` if-then-else, we only lift `(<- ...)` occurring in the condition.
-    else if h : args.size >= 2 ∧ (k == ``termDepIfThenElse || k == ``termIfThenElse) then do
-      let inAntiquot := stx.isAntiquot && !stx.isEscapedAntiquot
-      let arg1 ← expandLiftMethodAux (inQuot && !inAntiquot || stx.isQuot) inBinder args[1]
-      let args := args.set! 1 arg1
-      return Syntax.node i k args
-    else if k == ``Parser.Term.liftMethod && !inQuot then withFreshMacroScope do
-      if inBinder then
-        throwErrorAt stx "cannot lift `(<- ...)` over a binder, this error usually happens when you are trying to lift a method nested in a `fun`, `let`, or `match`-alternative, and it can often be fixed by adding a missing `do`"
-      let term := args[1]!
-      let term ← expandLiftMethodAux inQuot inBinder term
-      -- keep name deterministic across choice branches
-      let id ← mkIdentFromRef (.num baseId (← get).length)
-      let auxDoElem : Syntax ← `(doElem| let $id:ident ← $term:term)
-      modify fun s => s ++ [auxDoElem]
-      return id
-    else do
-      let inAntiquot := stx.isAntiquot && !stx.isEscapedAntiquot
-      let inBinder   := inBinder || (!inQuot && liftMethodForbiddenBinder stx)
-      let args ← args.mapM (expandLiftMethodAux (inQuot && !inAntiquot || stx.isQuot) inBinder)
-      return Syntax.node i k args
-  | stx => return stx
-
-#check Lean.Elab.Term.Do.ToCodeBlock.expandLiftMethod
-
-def expandLiftMethod (doElem : Syntax) : TermElabM (List Syntax × Syntax) := do
-  if !hasLiftMethod doElem then
-    return ([], doElem)
-  else
-    let baseId ← withFreshMacroScope (MonadQuotation.addMacroScope `__do_lift)
-    let (doElem, doElemsNew) ← (expandLiftMethodAux baseId false false doElem).run []
-    return (doElemsNew, doElem)
-
-@[term_elab «gdo»] def elabGDo : TermElab := fun stx expectedType? => do
-  tryPostponeIfNoneOrMVar expectedType?
-  let bindInfo ← extractBind expectedType?
-  let m ← Term.exprToSyntax bindInfo.m
-  let returnType ← Term.exprToSyntax bindInfo.returnType
-  let codeBlock ← Do.ToCodeBlock.run stx m returnType
-  let stxNew ← liftMacroM <| Do.ToTerm.run codeBlock.code m returnType
-  trace[Elab.gdo] stxNew
-  withMacroExpansion stx stxNew <| elabTermEnsuringType stxNew bindInfo.expectedType
-  --withMacroExpansion stx stxNew <| elabTermEnsuringType stxNew bindInfo.expectedType
-end test
--/
 
 def test_lithium (A : Atom PROP Nat) : Li PROP Bool := do
   let b ← exhale do

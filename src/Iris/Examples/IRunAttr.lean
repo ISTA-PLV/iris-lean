@@ -34,6 +34,7 @@ def IRunTacticType.run (tac : IRunTacticType) : MVarId → TacticM (Option (List
 
 structure IRunTactic where
   tac : IRunTacticType
+  name : Name
 
 structure IRunEntry where
   tac : Name ⊕ IRunTactic
@@ -44,12 +45,48 @@ instance : BEq IRunEntry where
 instance : Inhabited IRunEntry where
   default := ⟨.inl default, 0, default⟩
 
+structure IRunTacticSerialized where
+  name : Name
+
+structure IRunEntrySerialized where
+  tac : Name ⊕ IRunTacticSerialized
+  prio : Nat
+  name : Name
+instance : BEq IRunEntrySerialized where
+  beq _ _ := false
+instance : Inhabited IRunEntrySerialized where
+  default := ⟨.inl default, 0, default⟩
+
+def IRunEntry.serialize (e : IRunEntry) : IRunEntrySerialized := {
+  tac := match e.tac with
+         | .inl n => .inl n
+         | .inr n => .inr ⟨n.name⟩
+  prio := e.prio
+  name := e.name
+}
+
+def IRunEntrySerialized.deserialize (e : IRunEntrySerialized) : CoreM IRunEntry := do
+  let tac  ← match e.tac with
+           | .inl n => .pure (.inl n)
+           | .inr n => unsafe do
+             let ty := (← getConstInfo n.name).type
+             if ty != .const ``IRunTacticType [] then
+               throwError "The tactic should have type IRunTacticType."
+             -- is this the compilation the right thing to do?
+             let .defnInfo d ← getConstInfo n.name | throwError "The tactic should be a definition."
+             compileDecl (.defnDecl d)
+             let tac ← evalConst IRunTacticType n.name
+             return (.inr ⟨tac, n.name⟩ : Name ⊕ IRunTactic)
+  return {tac, prio := e.prio, name := e.name}
+
 /-- Environment extension for `irun` -/
 initialize irunExt :
-    SimpleScopedEnvExtension (IRunEntry × Array DiscrTree.Key) (DiscrTree IRunEntry) ←
-  registerSimpleScopedEnvExtension {
+    ScopedEnvExtension (IRunEntrySerialized × Array DiscrTree.Key) (IRunEntry × Array DiscrTree.Key) (DiscrTree IRunEntry) ←
+  registerScopedEnvExtension {
+    mkInitial := .pure {}
     addEntry := fun dt (n, ks) => dt.insertCore ks n
-    initial := {}
+    ofOLeanEntry := fun _ (n, ks) => ImportM.runCoreM do return (← n.deserialize, ks)
+    toOLeanEntry := fun (n, ks) => (n.serialize, ks)
   }
 
 def unpackEntails : Expr → Option (Expr × Expr)
@@ -102,14 +139,8 @@ initialize unsafe registerBuiltinAttribute {
       let stx ← `(iprop($(TSyntax.mk stx)))
       Term.elabTerm stx none
 
-    let ty := (← getConstInfo decl).type
-    if ty != .const ``IRunTacticType [] then
-      throwError "The tactic should have type IRunTacticType."
-    -- is this the compilation the right thing to do?
-    let .defnInfo d ← getConstInfo decl | throwError "The tactic should be a definition."
-    compileDecl (.defnDecl d)
-    let tac ← evalConst IRunTacticType decl
+    let tac ← (IRunEntrySerialized.mk (.inr ⟨decl⟩) prio decl).deserialize
     for pat in pats do
       let key ← DiscrTree.mkPath pat
-      irunExt.add (⟨.inr ⟨tac⟩, prio, decl⟩, key) kind
+      irunExt.add (tac, key) kind
 }
