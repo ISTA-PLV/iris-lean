@@ -55,6 +55,16 @@ partial def irunCore (nsteps : Option Nat) : TacticM Unit := do profileitM Excep
     -- reduce matches, very cheap
     -- TODO: make this an option?
     if true then
+/-
+      -- TODO: do we want this?
+      let g ← instantiateMVars <| ← goal.getType
+      let some #[prop, bi, P, G] := g.appM? ``Entails' | throwError "not in proof mode"
+      let G' ← whnfR G
+      let g' := mkApp4 (.const ``Entails' [g.getAppFn.constLevels![0]!]) prop bi P G'
+      goal := ← goal.replaceTargetDefEq g'
+      progress_match := G != G'
+      logInfo m!"G: {G}, G': {G}"
+-/
       repeat do
         let g ← instantiateMVars <| ← goal.getType
         let some #[prop, bi, P, G] := g.appM? ``Entails' | throwError "not in proof mode"
