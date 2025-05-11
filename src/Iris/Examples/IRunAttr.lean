@@ -29,9 +29,14 @@ register_simp_attr irun_simp
 register_simp_attr irun_solve
 register_simp_attr irun_preprocess
 
-def IRunTacticType : Type := MVarId → TacticM (Option (List MVarId × List MVarId))
+structure IRunConfig where
+  debug := false
 
-def IRunTacticType.run (tac : IRunTacticType) : MVarId → TacticM (Option (List MVarId × List MVarId)) := tac
+declare_config_elab elabIRunConfig IRunConfig
+
+def IRunTacticType : Type := MVarId → IRunConfig → TacticM (Option (List MVarId × List MVarId))
+
+def IRunTacticType.run (tac : IRunTacticType) : MVarId → IRunConfig → TacticM (Option (List MVarId × List MVarId)) := tac
 
 structure IRunTactic where
   tac : IRunTacticType

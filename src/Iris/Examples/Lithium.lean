@@ -294,7 +294,7 @@ theorem inhale_atom_with_ref_tac {α : Type _} [BI PROP] {P : PROP} (A : Atom PR
     mysorry
 
 @[irun_tac (inhaleR (atom_with_ref _ _)) _]
-def irunInhaleAtomWithRef : IRunTacticType := fun goal => do profileitM Exception "irunInhaleAtomWithRef" (← getOptions) do
+def irunInhaleAtomWithRef : IRunTacticType := fun goal _config => do profileitM Exception "irunInhaleAtomWithRef" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
   let some { prop, bi, e, hyps, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
   let_expr inhaleR _ _ _ L E := G | return none
@@ -321,7 +321,7 @@ theorem inhale_pers_atom_with_ref_tac {α : Type _} [BI PROP] {P : PROP} (A : At
 
 -- TODO: unify with irunInhaleAtomWithRef?
 @[irun_tac (inhaleR (pers (atom_with_ref _ _))) _]
-def irunInhalePersAtomWithRef : IRunTacticType := fun goal => do profileitM Exception "irunInhaleAtomWithRef" (← getOptions) do
+def irunInhalePersAtomWithRef : IRunTacticType := fun goal _config => do profileitM Exception "irunInhaleAtomWithRef" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
   let some { u, prop, bi, e, hyps, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
   let_expr inhaleR _ _ _ L E := G | return none
@@ -348,7 +348,7 @@ theorem inhale_prop_tac [BI PROP] φ (P : PROP) E
    mysorry
 
 @[irun_tac inhaleR (prop _) _]
-def irunInhaleProp : IRunTacticType := fun goal => do profileitM Exception "irunInhaleProp" (← getOptions) do
+def irunInhaleProp : IRunTacticType := fun goal _config => do profileitM Exception "irunInhaleProp" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
   let some { u, prop:=prop, bi:=bi, e, hyps:=hyps, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
   let_expr inhaleR _ _ _ L E := G | return none
@@ -384,7 +384,7 @@ def irunInhaleProp : IRunTacticType := fun goal => do profileitM Exception "irun
   return .some (mvars, [])
 
 
-theorem cancel {α : Type _} [BI PROP] {p : Bool} {P P' : PROP} (A : Atom PROP α) (a : α) {E}
+theorem exhale_atom_direct_tac {α : Type _} [BI PROP] {p : Bool} {P P' : PROP} (A : Atom PROP α) (a : α) {E}
   (_hP : P ⊣⊢ P' ∗ □?p A.ref a)
   (_h : P' ⊢ E a)
  : P ⊢ exhaleR (atom A) E := by
@@ -393,7 +393,7 @@ theorem cancel {α : Type _} [BI PROP] {p : Bool} {P P' : PROP} (A : Atom PROP �
 @[match_pattern] def mkApp11 (f a b c d e₁ e₂ e₃ e₄ e₅ e₆ e₇ : Expr) := mkApp7 (mkApp4 f a b c d) e₁ e₂ e₃ e₄ e₅ e₆ e₇
 
 @[irun_tac exhaleR (atom _) _]
-def irunExhaleAtom : IRunTacticType := fun goal => do profileitM Exception "irunExhaleAtom" (← getOptions) do
+def irunExhaleAtomDirect : IRunTacticType := fun goal _config => do profileitM Exception "irunExhaleAtomDirect" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
   let some { prop, bi, e, hyps, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
   let_expr exhaleR _ _ _ L E := G | return none
@@ -408,7 +408,7 @@ def irunExhaleAtom : IRunTacticType := fun goal => do profileitM Exception "irun
     | return none
   let m ← mkFreshExprSyntheticOpaqueMVar <|
     IrisGoal.toExpr { prop, bi, hyps := hyps, goal := Expr.beta E #[a] }
-  let pf := mkApp11 (.const ``cancel us) prop α bi b e P' A a E pf m
+  let pf := mkApp11 (.const ``exhale_atom_direct_tac us) prop α bi b e P' A a E pf m
   goal.assign pf
   return .some ([m.mvarId!], [])
 
@@ -425,7 +425,7 @@ theorem exhale_prop_tac [BI PROP] (P : PROP) (φ : Prop) E
    mysorry
 
 @[irun_tac 20 | exhaleR (prop _) _]
-def irunExhaleProp : IRunTacticType := fun goal => do profileitM Exception "irunExhaleProp" (← getOptions) do
+def irunExhaleProp : IRunTacticType := fun goal _config => do profileitM Exception "irunExhaleProp" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
   let some { u, prop, bi, e, hyps, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
   let_expr exhaleR _ _ _ L E := G | return none
@@ -443,7 +443,7 @@ theorem all_tac [BI PROP] {α : Type _} (P : PROP) E
    mysorry
 
 @[irun_tac allR _]
-def irunAll : IRunTacticType := fun goal => do profileitM Exception "irunAll" (← getOptions) do
+def irunAll : IRunTacticType := fun goal _config => do profileitM Exception "irunAll" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
   let some { prop:=prop, bi:=bi, e, hyps:=hyps, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
   let_expr allR _ _ α E := G | return none
@@ -463,7 +463,7 @@ theorem done_tac [BI PROP] (P : PROP)
  : P ⊢ doneR := pure_intro .intro
 
 @[irun_tac doneR]
-def irunDone : IRunTacticType := fun goal => do profileitM Exception "irunDone" (← getOptions) do
+def irunDone : IRunTacticType := fun goal _config => do profileitM Exception "irunDone" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
   let some { prop:=prop, bi:=bi, hyps:=_, e, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
   let .true := G.isAppOfArity ``doneR 2 | return none
@@ -479,7 +479,7 @@ theorem branch_tac [BI PROP] P (E1 E2 : PROP)
    apply and_intro <;> trivial
 
 @[irun_tac branchR _ _]
-def irunBranch : IRunTacticType := fun goal => do profileitM Exception "irunBranch" (← getOptions) do
+def irunBranch : IRunTacticType := fun goal _config => do profileitM Exception "irunBranch" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
   let some ig := parseIrisGoal? g | throwError "not in proof mode"
   let { u, prop, bi, e, hyps:=_, goal:=G } := ig
@@ -510,7 +510,7 @@ theorem lif_branch [BI PROP] {cond : Prop} (E1 E2 : PROP) :
    by mysorry
 
 @[irun_tac simpR _ _ _ _]
-def irunSimp : IRunTacticType := fun goal => do profileitM Exception "irunSimp" (← getOptions) do
+def irunSimp : IRunTacticType := fun goal _config => do profileitM Exception "irunSimp" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
   let some ig := parseIrisGoal? g | throwError "not in proof mode"
   let { prop:=_, bi:=_, e:=_, hyps:=_, goal:=G } := ig
@@ -760,7 +760,7 @@ section
 open Lean Elab Tactic Meta Qq BI Std ProofMode
 
 @[irun_tac subst_okR _ _ _ _]
-def irunSubst : IRunTacticType := fun goal => do profileitM Exception "irunSubst" (← getOptions) do
+def irunSubst : IRunTacticType := fun goal _config => do profileitM Exception "irunSubst" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
   let some ig := parseIrisGoal? g | throwError "not in proof mode"
   let { prop:=_, bi:=_, e:=_, hyps:=_, goal:=G } := ig

@@ -32,7 +32,7 @@ noncomputable def PROPTest_test : PROPTest := iprop(True)
 def prop_test [BI PROP] : PROP := iprop(True)
 
 @[irun_tac 100 | PROPTest_test, iprop((∃ _, ∀ _, prop_test ∗ _)), iprop((⌜_⌝ ∗ _ ∗ _) -∗ _), _ ∗ _]
-def irunTest : IRunTacticType := fun goal => do
+def irunTest : IRunTacticType := fun goal _config => do
   IO.println s!"Test Tac {← ppExpr (← goal.getType)}"
   return none
 
@@ -41,7 +41,7 @@ theorem intro_tac [BI PROP] {P A Q : PROP}
  : P ⊢ A -∗ Q := wand_intro h
 
 @[irun_tac _ -∗ _]
-def irunIntro : IRunTacticType := fun goal => do profileitM Exception "irunIntro" (← getOptions) do
+def irunIntro : IRunTacticType := fun goal _config => do profileitM Exception "irunIntro" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
   let some { prop, bi, e, hyps, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
   let ~q(iprop($A -∗ $Q)) := G | return none
@@ -67,7 +67,7 @@ theorem cancel [BI PROP] {p : Bool} {P P' A Q' : PROP}
    hP.1.trans <| sep_comm.1.trans <| sep_mono intuitionisticallyIf_elim h
 
 @[irun_tac _ ∗ _]
-def irunCancel : IRunTacticType := fun goal => do profileitM Exception "irunCancel" (← getOptions) do
+def irunCancel : IRunTacticType := fun goal _config => do profileitM Exception "irunCancel" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
   let some { prop, bi, hyps, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
   let ~q(iprop($A ∗ $Q)) := G | return none
@@ -88,7 +88,7 @@ theorem true_tac [BI PROP] (P : PROP)
  : P ⊢ True := pure_intro .intro
 
 @[irun_tac True]
-def irunTrue : IRunTacticType := fun goal => do profileitM Exception "irunTrue" (← getOptions) do
+def irunTrue : IRunTacticType := fun goal _config => do profileitM Exception "irunTrue" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
   let some { prop:=prop, bi:=bi, hyps:=_, e, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
   let ~q(iprop(True)) := G | return none
@@ -114,7 +114,7 @@ theorem lif_false [BI PROP] {cond : Prop} (E1 E2 : PROP) :
 def wpsimp {α : Type _} [BI PROP] (_ : Lean.Name) (a : α) (P : α -> PROP) : PROP := P a
 
 @[irun_tac wpsimp _ _ _]
-def irunSimp : IRunTacticType := fun goal => do profileitM Exception "irunSimp" (← getOptions) do
+def irunSimp : IRunTacticType := fun goal _config => do profileitM Exception "irunSimp" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
   let some ig := parseIrisGoal? g | throwError "not in proof mode"
   let { prop:=_, bi:=_, e:=_, hyps:=_, goal:=G } := ig
@@ -268,7 +268,7 @@ section
 open Lean Elab Tactic Meta Qq BI Std ProofMode
 
 @[irun_tac wpsubst _ _ _ _]
-def irunSubst : IRunTacticType := fun goal => do profileitM Exception "irunSubst" (← getOptions) do
+def irunSubst : IRunTacticType := fun goal _config => do profileitM Exception "irunSubst" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
   let some ig := parseIrisGoal? g | throwError "not in proof mode"
   let { prop:=_, bi:=_, e:=_, hyps:=_, goal:=G } := ig

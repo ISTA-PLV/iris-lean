@@ -26,11 +26,6 @@ next steps:
 namespace Iris.ProofMode
 open Lean Elab Tactic Meta Qq BI Std
 
-structure IRunConfig where
-  debug := false
-
-declare_config_elab elabIRunConfig IRunConfig
-
 syntax "irunsolve" : tactic
 --macro_rules
 --  | `(tactic|irunsolve) => `(tactic|trivial)
@@ -144,7 +139,7 @@ partial def irunCore (config : IRunConfig) (nsteps : Option Nat) : TacticM Unit 
           goal.assign pf
           return (true, m.mvarId!::goals', shelved)
         | .inr tac =>
-          let .some (goals_new, shelved_new) ← tac.tac.run goal | continue
+          let .some (goals_new, shelved_new) ← tac.tac.run goal config | continue
           return (true, goals_new++goals', shelved++shelved_new)
       return (false, goal::goals', shelved)
     if !progress && !progress_match then
