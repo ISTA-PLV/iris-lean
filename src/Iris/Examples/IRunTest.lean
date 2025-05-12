@@ -13,12 +13,12 @@ import Iris.Examples.Exp
 namespace Iris.ProofMode
 open Lean Elab Tactic Meta Qq BI Std
 
-@[irun 5]
+@[irun:high]
 theorem li_assoc_star.{u} {PROP : Type u} [BI PROP] {P1 P2 P3 : PROP}
  : P1 ∗ (P2 ∗ P3) ⊢ (P1 ∗ P2) ∗ P3 :=
    sorry
 
-@[irun 5]
+@[irun:high]
 theorem li_assoc_wand.{u} {PROP : Type u} [BI PROP] {P1 P2 P3 : PROP}
  : (P1 -∗ P2 -∗ P3) ⊢ (P1 ∗ P2) -∗ P3 :=
    sorry
@@ -31,7 +31,7 @@ noncomputable def PROPTest_test : PROPTest := iprop(True)
 
 def prop_test [BI PROP] : PROP := iprop(True)
 
-@[irun_tac 100 | PROPTest_test, iprop((∃ _, ∀ _, prop_test ∗ _)), iprop((⌜_⌝ ∗ _ ∗ _) -∗ _), _ ∗ _]
+@[irun_tac:1 PROPTest_test, iprop((∃ _, ∀ _, prop_test ∗ _)), iprop((⌜_⌝ ∗ _ ∗ _) -∗ _), _ ∗ _]
 def irunTest : IRunTacticType := fun goal _config => do
   IO.println s!"Test Tac {← ppExpr (← goal.getType)}"
   return none

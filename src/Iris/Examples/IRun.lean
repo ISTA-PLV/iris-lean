@@ -65,7 +65,7 @@ def irunSearch (config : IRunConfig) (goal : MVarId) (tree : DiscrTree IRunEntry
     let G ← instantiateExprMVars G
     if G.isMVar then throwError "irun failed: goal has free metavars"
     let tacs ← tree.getMatch G
-    let tacs := tacs.insertionSort λ a b => a.prio < b.prio
+    let tacs := tacs.insertionSort λ a b => a.prio > b.prio
     for tac in tacs do
       if config.debug then logInfo m!"trying {tac.name}"
       match tac.tac with
@@ -74,8 +74,8 @@ def irunSearch (config : IRunConfig) (goal : MVarId) (tree : DiscrTree IRunEntry
         -- TODO: create new mvar level to prevent instantiating mvars in the goal, see https://leanprover.zulipchat.com/#narrow/channel/270676-lean4/topic/Difference.20between.20DiscrTree.2EgetMatch.20and.20DiscrTree.2EgetUnify/near/513194806 ?
         let pf := mkConst decl (← mkFreshLevelMVarsFor info)
         let (args, _, targetTy) ← forallMetaTelescopeReducing (← inferType pf)
-        let .some (Gnew, Gdecl) := (unpackEntails targetTy) | throwError "theorem is not entails, this should not happen"
-        let .true ← isDefEq G Gdecl | continue
+        let .some (Gnew, Gdecl) := unpackEntails targetTy | throwError "theorem is not entails, this should not happen"
+        let .true ← withReducible <| isDefEq G Gdecl | continue
 
         let mut do_cont := false
         for mvar in args do

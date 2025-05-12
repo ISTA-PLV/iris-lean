@@ -439,24 +439,26 @@ theorem exhale_atom_cancel_tac {α : Type _} [BI PROP] {p : Bool} {P P' Q : PROP
  : P ⊢ exhaleR (atom A) E := by
    mysorry
 
-@[irun_tac 20 | exhaleR (atom _) _]
+@[irun_tac:high exhaleR (atom _) _]
 def irunExhaleAtomCancel : IRunTacticType := fun goal config => do profileitM Exception "irunExhaleAtomCancel" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
   let some { u, prop, bi, hyp, goal:=G } := parseIrisGoalShallow? g | throwError "not in proof mode"
   let_expr exhaleR _ _ _ L E := G | return none
   let_expr atom _ α A := L | return none
   let .some ⟨e, hyps⟩ := parseHypsFromShallow? u prop bi hyp | return none
+  let hyp' := ← mkFreshExprMVar (.some prop)
   let us := L.getAppFn.constLevels!
   let tree := irunExt.getState (← getEnv)
-  let some ⟨(m, goals, shelved), P', _hyps, out, _ty, b, _, pf⟩ ←
+  let some ⟨(m, goals, shelved), P', hyps, _out, ty, b, _, pf⟩ ←
     hyps.removeG false fun _ _ _ Q => do
       let m ← mkFreshExprSyntheticOpaqueMVar <|
-        IrisGoal.toExpr { prop, bi, hyps := hyps, goal := mkApp6 (.const ``cancelR us) prop bi α Q A E }
+        IrisGoalShallow.toExpr { u, prop, bi, hyp := hyp', goal := mkApp6 (.const ``cancelR us) prop bi α Q A E }
       let (progress, goals, shelved) ← irunSearch config m.mvarId! tree
       if !progress then return none
       return (m, goals, shelved)
     | return none
-  let pf := mkApp11 (.const ``exhale_atom_cancel_tac us) prop α bi b e P' out A E pf m
+  hyp'.mvarId!.assign hyps.tm
+  let pf := mkApp11 (.const ``exhale_atom_cancel_tac us) prop α bi b e P' ty A E pf m
   goal.assign pf
   return .some (goals, shelved)
 
@@ -476,7 +478,7 @@ theorem exhale_prop_tac [BI PROP] (P : PROP) (φ : Prop) E
  : P ⊢ exhaleR (prop φ) E := by
    mysorry
 
-@[irun_tac 20 | exhaleR (prop _) _]
+@[irun_tac:low exhaleR (prop _) _]
 def irunExhaleProp : IRunTacticType := fun goal _config => do profileitM Exception "irunExhaleProp" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
   let some { u, prop, bi, hyp, goal:=G } := parseIrisGoalShallow? g | throwError "not in proof mode"
@@ -556,7 +558,7 @@ theorem lif_false [BI PROP] {cond : Prop} (E1 E2 : PROP) :
    lifR cond E1 E2 ⊣ E2 :=
    by mysorry
 
-@[irun 20]
+@[irun:low]
 theorem lif_branch [BI PROP] {cond : Prop} (E1 E2 : PROP) :
    lifR cond E1 E2 ⊣ branchR (inhaleR (prop cond) λ _ => E1) (inhaleR (prop (¬ cond)) λ _ => E2) :=
    by mysorry
@@ -604,7 +606,7 @@ example (P : Nat → Atom PROP Unit) (Q : Atom PROP Unit) :
      irun 1
      irun 1
      irun 1
-     irun +debug 1
+     irun 1
      irun 1
      irun ∞
 
@@ -625,16 +627,27 @@ example (P G : Atom PROP Unit) :
     irun 1
     irun 1
 
+/-
+not reversed:
+- time with direct cancellation for 100: 756ms
+- time with direct cancellation for 200: 3011ms
+- time with generic cancellation for 100: 10884ms
+- time with generic cancellation for 200: 39206ms
+reversed:
+- time is basically identical between the two versions
+  => Is mvar creation the problem?
+-/
 --set_option profiler true in
 --set_option profiler.threshold 1 in
 set_option maxRecDepth 30000 in
+set_option maxHeartbeats 2000000 in
 #time example (P : Nat → Atom PROP Unit) :
-  ⊢ inhaleR (List.foldl (λ G n => (atom_with_ref (P n) () ≫ G)) (.pure tt) (List.range 2)) λ _ =>
+  ⊢ inhaleR (List.foldl (λ G n => (atom_with_ref (P n) () ≫ G)) (.pure tt) (List.range 200)) λ _ =>
     (List.foldl (λ G n => exhaleR (atom (P n)) λ _ => G)
       (doneR) (
     -- List.reverse makes cancellation basically instant
-    -- List.reverse
-    (List.range 2)))
+    List.reverse
+    (List.range 200)))
 
 :=
   by
@@ -921,7 +934,7 @@ theorem prove_fn_ok α β v Gpre Gpost E :
    Gpost E := by mysorry
 
 -- should be applied after the inlining rule
-@[irun 20]
+@[irun:low]
 theorem app_okR_spec v1 v2 :
   app_okR (PROP:=PROP) v1 v2 :-
    (exhale (atom (fn_spec v1))).bind λ ⟨_, Gpre, Gpost⟩ =>

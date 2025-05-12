@@ -99,16 +99,17 @@ def unpackEntails : Expr → Option (Expr × Expr)
   | .app (.app (.app (.app (.const ``Entails _) _) _) G') G => some (G', G)
   | _ => none
 
-def irun_default_prio : Nat := 10
+def irun_default_prio : Nat := (eval_prio default)
 
-syntax (name := irun) "irun" ("?")? (num)?  : attr
+syntax (name := irun) "irun" (":" prio)? ("?")?  : attr
 
 initialize registerBuiltinAttribute {
   name := `irun
   descr := "irun lemma"
   add := fun decl stx kind => MetaM.run' do
-    let prio := if stx[2][0].isMissing then some irun_default_prio else stx[2][0].isNatLit?
-    let .some prio := prio | throwError "unknown prio: {stx[2][0]}"
+    -- TODO: use evalPrio?
+    let prio := if stx[1][1].isMissing then some irun_default_prio else stx[1][1].isNatLit?
+    let .some prio := prio | throwError "unknown prio: {stx[1][1]}"
     let declInfo ← getConstInfo decl
     let declTy := declInfo.type
     let (e, ty) ← forallTelescope declTy λ args ty => do
@@ -116,7 +117,7 @@ initialize registerBuiltinAttribute {
       let (res, _) ← simpWithExt `irun_preprocess ty (config := {iota := false})
       let ty := res.expr
       return (← mkLambdaFVars args (← res.mkCast (mkAppN (← mkConstWithLevelParams decl) args)), ← mkForallFVars args ty)
-    if !stx[1][0].isMissing then
+    if !stx[2][0].isMissing then
       logInfo m!"{ty}"
     let newName : Name := .str declInfo.name "irun"
     let newDecl := (.defnDecl {name := newName, levelParams := declInfo.levelParams, type := ty, value := e, hints := .opaque, safety := .safe })
@@ -130,7 +131,7 @@ initialize registerBuiltinAttribute {
     | _ => throwError "@[irun] unexpected type"
 }
 
-syntax (name := irun_tac) "irun_tac" (num "|")? (ppSpace term),* : attr
+syntax (name := irun_tac) "irun_tac" (":" prio)? (ppSpace term),* : attr
 
 -- TODO: Is this unsafe a problem? Can we get around it?
 initialize unsafe registerBuiltinAttribute {
@@ -138,8 +139,8 @@ initialize unsafe registerBuiltinAttribute {
   descr := "irun tactic"
   -- we ignore TC failures for BI, they should just create metavariables
   add := fun decl stx kind => MetaM.run' do Elab.Term.TermElabM.run' (ctx := {ignoreTCFailures := true}) do
-    let prio := if stx[1][0].isMissing then some irun_default_prio else stx[1][0].isNatLit?
-    let .some prio := prio | throwError "unknown prio: {stx[1][0]}"
+    let prio := if stx[1][1].isMissing then some irun_default_prio else stx[1][1].isNatLit?
+    let .some prio := prio | throwError "unknown prio: {stx[1][1]}"
 
     let pats ← stx[2].getSepArgs.mapM λ stx => do
       let stx ← `(iprop($(TSyntax.mk stx)))
