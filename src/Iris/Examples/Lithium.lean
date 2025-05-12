@@ -5,6 +5,7 @@ Authors: Michael Sammler
 -/
 --import Lean.Parser.Do
 --import Lean.Elab.Do
+--import Lean
 import Iris.BI
 import Iris.ProofMode
 import Iris.Examples.IRunAttr
@@ -50,6 +51,12 @@ variable {PROP : Type u} [BI.{u} PROP] {α : Type v} {β : Type w}
 structure Atom (PROP : Type u) (α : Type v) where
   ref : α → PROP
 
+-- TODO: Better symbol?
+-- TODO: What are good precedences here?
+notation:90 A:90 " # " a:90 => (Atom.ref A a)
+delab_rule Atom.ref
+  | `($_ $A $a) => do ``($A # $a)
+
 structure InEx (PROP : Type u) (α : Type v) where
   body : α → PROP
 
@@ -82,7 +89,7 @@ instance : Monad (InEx PROP) where
   bind := .bind
 
 def atom (A : Atom PROP α) : InEx PROP α := InEx.mk A.ref
-def atom_with_ref (A : Atom PROP α) (a : α) : InEx PROP Unit := .mk λ _ => iprop(A.ref a)
+def atom_with_ref (A : Atom PROP α) (a : α) : InEx PROP Unit := .mk λ _ => iprop(A # a)
 def prop (P : Prop) : InEx PROP Unit := .mk λ _ => iprop(⌜P⌝)
 def pers (L : InEx PROP α) : InEx PROP α := .mk λ a => iprop(□ L.body a)
 
@@ -145,6 +152,17 @@ def inhale (L : InEx PROP α) : Li PROP α := {
     ispecialize HE HL
     ispecialize Hwand HE
     iassumption
+}
+
+def cancelR (P : PROP) (A : Atom PROP α) (E : α → PROP) : PROP :=
+  iprop(P -∗ ∃ a, A # a ∗ E a)
+
+@[irun_preprocess]
+def cancel (P : PROP) (A : Atom PROP α) : Li PROP α := {
+  run := cancelR P A
+  mono' E1 E2 := by
+    dsimp [cancelR]
+    mysorry
 }
 
 def allR {α : Type v} (E : α → PROP) : PROP :=
@@ -288,7 +306,7 @@ namespace Iris.ProofMode
 open Lean Elab Tactic Meta Qq BI Std Lithium
 
 theorem inhale_atom_with_ref_tac {α : Type _} [BI PROP] {P : PROP} (A : Atom PROP α) (a : α) (E : Unit → PROP)
-  (_h : P ∗ A.ref a ⊢ E ())
+  (_h : P ∗ A # a ⊢ E ())
  : P ⊢ (inhaleR (atom_with_ref A a)) E := by
     simp [inhaleR, atom_with_ref]
     mysorry
@@ -314,7 +332,7 @@ def irunInhaleAtomWithRef : IRunTacticType := fun goal _config => do profileitM 
   return .some ((← goals.get).toList, [])
 
 theorem inhale_pers_atom_with_ref_tac {α : Type _} [BI PROP] {P : PROP} (A : Atom PROP α) (a : α) (E : Unit → PROP)
-  (_h : P ∗ □ A.ref a ⊢ E ())
+  (_h : P ∗ □ A # a ⊢ E ())
  : P ⊢ (inhaleR (pers (atom_with_ref A a))) E := by
     simp [inhaleR, atom_with_ref]
     mysorry
@@ -385,7 +403,7 @@ def irunInhaleProp : IRunTacticType := fun goal _config => do profileitM Excepti
 
 
 theorem exhale_atom_direct_tac {α : Type _} [BI PROP] {p : Bool} {P P' : PROP} (A : Atom PROP α) (a : α) {E}
-  (_hP : P ⊣⊢ P' ∗ □?p A.ref a)
+  (_hP : P ⊣⊢ P' ∗ □?p A # a)
   (_h : P' ⊢ E a)
  : P ⊢ exhaleR (atom A) E := by
    mysorry
@@ -411,6 +429,36 @@ def irunExhaleAtomDirect : IRunTacticType := fun goal _config => do profileitM E
   let pf := mkApp11 (.const ``exhale_atom_direct_tac us) prop α bi b e P' A a E pf m
   goal.assign pf
   return .some ([m.mvarId!], [])
+
+theorem exhale_atom_cancel_tac {α : Type _} [BI PROP] {p : Bool} {P P' Q : PROP} (A : Atom PROP α) {E}
+  (_hP : P ⊣⊢ P' ∗ □?p Q)
+  (_h : P' ⊢ cancelR Q A E)
+ : P ⊢ exhaleR (atom A) E := by
+   mysorry
+
+@[irun_tac 20 | exhaleR (atom _) _]
+def irunExhaleAtomCancel : IRunTacticType := fun goal config => do profileitM Exception "irunExhaleAtomCancel" (← getOptions) do
+  let g ← instantiateMVars <| ← goal.getType
+  let some { prop, bi, e, hyps, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
+  let_expr exhaleR _ _ _ L E := G | return none
+  let_expr atom _ α A := L | return none
+  let us := L.getAppFn.constLevels!
+  let tree := irunExt.getState (← getEnv)
+  let some ⟨(m, goals, shelved), P', _hyps, out, _ty, b, _, pf⟩ ←
+    hyps.removeG false fun _ _ _ Q => do
+      let m ← mkFreshExprSyntheticOpaqueMVar <|
+        IrisGoal.toExpr { prop, bi, hyps := hyps, goal := mkApp6 (.const ``cancelR us) prop bi α Q A E }
+      let (progress, goals, shelved) ← irunSearch config m.mvarId! tree
+      if !progress then return none
+      return (m, goals, shelved)
+    | return none
+  let pf := mkApp11 (.const ``exhale_atom_cancel_tac us) prop α bi b e P' out A E pf m
+  goal.assign pf
+  return .some (goals, shelved)
+
+@[irun]
+theorem cancel_match [BI PROP] {α : Type _} (A : Atom PROP α) a E :
+  cancelR (A # a) A E ⊣ E a := by mysorry
 
 @[irun]
 theorem exhale_prop [BI PROP] P (E : Unit → PROP) :
@@ -552,7 +600,7 @@ example (P : Nat → Atom PROP Unit) (Q : Atom PROP Unit) :
      irun 1
      irun 1
      irun 1
-     irun 1
+     irun +debug 1
      irun 1
      irun ∞
 
@@ -840,10 +888,10 @@ def fn_ok {α β : Type _} (v : Val) (Gpre : Val → Li PROP α) (Gpost : α →
 
 def fn_spec_inex (v : Val) : Atom PROP ((α : Type w) × (Val → InEx PROP α) × (α → Val → InEx PROP Unit)) :=
   Atom.mk λ ⟨α, Lpre, Lpost⟩ =>
-    (fn_spec v).ref ⟨α, λ va => exhale (Lpre va), λ a vr => (exhale (Lpost a vr)).bind λ _ => done⟩
+    fn_spec v # ⟨α, λ va => exhale (Lpre va), λ a vr => (exhale (Lpost a vr)).bind λ _ => done⟩
 
 theorem prove_fn_spec {α : Type _} v Gpre Gpost :
-  (fn_spec (PROP:=PROP) v).ref ⟨α, Gpre, Gpost⟩ ⊣ (fn_ok v Gpre Gpost).go := by
+  fn_spec (PROP:=PROP) v # ⟨α, Gpre, Gpost⟩ ⊣ (fn_ok v Gpre Gpost).go := by
   mysorry
 
 @[irun]
@@ -927,7 +975,7 @@ theorem dualizing_fn_ok α β E v Gpre Gpost (G : _ → _) :
  := by mysorry
 
 example :
-  ⊢ (fn_spec (PROP:=PROP) rec_fn).ref ⟨Nat, λ va => exhale (natL va), λ _ _ => done⟩ := by
+  ⊢ fn_spec (PROP:=PROP) rec_fn # ⟨Nat, λ va => exhale (natL va), λ _ _ => done⟩ := by
   --istart
   unfold rec_fn
   --simp [fn_spec_inex]
@@ -942,7 +990,7 @@ def echo_fn : Val := .recv .anon .anon (.lete "x" (.app (.val getc_fn) (.val (.n
 def main_fn : Val := .recv .anon .anon (.app (.val echo_fn) (.val (.nat 0)))
 
 def echo_spec PROP [BI PROP] : PROP :=
-  (fn_spec echo_fn).ref ⟨_,
+  fn_spec echo_fn # ⟨_,
      λ _ => do
       fn_ok getc_fn
         (λ _ => .pure ())
@@ -961,7 +1009,7 @@ theorem echo_ok :
   irun
 
 theorem main_ok [BIAffine PROP] :
-  echo_spec PROP ⊢ (fn_spec main_fn).ref ⟨_, λ _ => .pure (), λ _ vr => do exhale (prop (vr = .nat 1)); done⟩ := by
+  echo_spec PROP ⊢ (fn_spec main_fn) # ⟨_, λ _ => .pure (), λ _ vr => do exhale (prop (vr = .nat 1)); done⟩ := by
   unfold echo_spec main_fn getc_fn putc_fn
   apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
   istart
@@ -984,7 +1032,7 @@ def fib : Nat → Nat
   | n+1+1 => fib n + fib (n + 1)
 
 theorem fib_ok [BIAffine PROP] :
-  ⊢ (fn_spec (PROP:=PROP) fib_fn).ref ⟨_,
+  ⊢ (fn_spec (PROP:=PROP) fib_fn) # ⟨_,
     λ va => do {let n ← exhale (natL va); exhale (prop (0 ≤ n)); return n},
     λ n vr => do {let nr ← exhale (natL vr); exhale (prop (nr = fib n)); done}⟩ := by
   unfold fib_fn
