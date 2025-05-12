@@ -26,6 +26,25 @@ next steps:
 namespace Iris.ProofMode
 open Lean Elab Tactic Meta Qq BI Std
 
+structure IrisGoalShallow where
+  u : Level
+  prop : Expr
+  bi : Expr
+  hyp : Expr
+  goal : Expr
+
+def IrisGoalShallow.toExpr (g : IrisGoalShallow) : Expr :=
+  mkApp4 (.const ``Entails' [g.u]) g.prop g.bi g.hyp g.goal
+
+def parseIrisGoalShallow? (expr : Expr) : Option IrisGoalShallow := do
+  let_expr Entails' prop bi hyp goal := expr | none
+  let u := expr.getAppFn.constLevels![0]!
+  some { u, prop, bi, hyp, goal }
+
+partial def parseHypsFromShallow? (u : Level) (prop : Expr) (bi : Expr) (expr : Expr) :
+    Option ((s : Expr) × @Hyps u prop bi s) := @parseHyps? u prop bi expr
+
+
 syntax "irunsolve" : tactic
 --macro_rules
 --  | `(tactic|irunsolve) => `(tactic|trivial)
@@ -40,7 +59,7 @@ theorem irun_apply.{u} {PROP : Type u} [BI PROP] {P Q Q' : PROP}
 def irunSearch (config : IRunConfig) (goal : MVarId) (tree : DiscrTree IRunEntry) : TacticM (Bool × List MVarId × List MVarId) := do
   goal.withContext do
     let mut g ← instantiateMVars <| ← goal.getType
-    let some { u, prop, bi, e, hyps, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
+    let some { u, prop, bi, hyp, goal:=G } := parseIrisGoalShallow? g | throwError "not in proof mode"
     if config.debug then logInfo m!"Goal: {G}"
     -- logInfo m!"IN LOOP: {G}"
     let G ← instantiateExprMVars G
@@ -73,8 +92,8 @@ def irunSearch (config : IRunConfig) (goal : MVarId) (tree : DiscrTree IRunEntry
 
         if config.debug then logInfo m!"successfully applied {tac.name}"
         let m ← mkFreshExprSyntheticOpaqueMVar <|
-          IrisGoal.toExpr { prop, bi, hyps := hyps, goal := Gnew }
-        let pf := mkApp7 (.const ``irun_apply [u]) prop bi e G Gnew (mkAppN pf args) m
+          IrisGoalShallow.toExpr { u, prop, bi, hyp, goal := Gnew }
+        let pf := mkApp7 (.const ``irun_apply [u]) prop bi hyp G Gnew (mkAppN pf args) m
         goal.assign pf
         return (true, [m.mvarId!], [])
       | .inr tac =>
@@ -110,9 +129,9 @@ partial def irunCore (config : IRunConfig) (nsteps : Option Nat) : TacticM Unit 
 
       -- TODO: do we want this?
       let g ← instantiateMVars <| ← goal.getType
-      let some #[prop, bi, P, G] := g.appM? ``Entails' | throwError "not in proof mode"
+      let some {u:=_, prop, bi, hyp, goal:=G} := parseIrisGoalShallow? g | throwError "not in proof mode"
       let G' ← whnfR G
-      let g' := mkApp4 (.const ``Entails' [g.getAppFn.constLevels![0]!]) prop bi P G'
+      let g' := mkApp4 (.const ``Entails' [g.getAppFn.constLevels![0]!]) prop bi hyp G'
       -- TODO: alternatively, we can do goal.setType g'. Does this make a difference?
       progress_match := G != G'
       if progress_match then

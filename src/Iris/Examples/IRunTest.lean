@@ -43,8 +43,9 @@ theorem intro_tac [BI PROP] {P A Q : PROP}
 @[irun_tac _ -∗ _]
 def irunIntro : IRunTacticType := fun goal _config => do profileitM Exception "irunIntro" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
-  let some { prop, bi, e, hyps, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
-  let ~q(iprop($A -∗ $Q)) := G | return none
+  let some { u, prop, bi, hyp, goal:=G } := parseIrisGoalShallow? g | throwError "not in proof mode"
+  let_expr wand _ _ A Q := G | return none
+  let .some ⟨e, hyps⟩ := parseHypsFromShallow? u prop bi hyp | return none
   let ident ← `(binderIdent| _)
   let (b, A') := if A.isAppOfArity ``intuitionistically 3 then
       (q(true), A.getArg! 3)
@@ -56,7 +57,7 @@ def irunIntro : IRunTacticType := fun goal _config => do profileitM Exception "i
       IrisGoal.toExpr { prop, bi, hyps, goal:=Q }
     goals.modify (·.push m.mvarId!)
     return m
-  let pf := q(@intro_tac $prop $bi $e $A $Q $pf)
+  let pf := mkApp6 (.const ``intro_tac [u]) prop bi e A Q pf
   goal.assign pf
   return .some ((← goals.get).toList, [])
 
@@ -69,18 +70,18 @@ theorem cancel [BI PROP] {p : Bool} {P P' A Q' : PROP}
 @[irun_tac _ ∗ _]
 def irunCancel : IRunTacticType := fun goal _config => do profileitM Exception "irunCancel" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
-  let some { prop, bi, hyps, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
-  let ~q(iprop($A ∗ $Q)) := G | return none
-  let some ⟨_inst, P', hyps, out, ty, b, _, pf⟩ ←
+  let some { u, prop, bi, hyp, goal:=G } := parseIrisGoalShallow? g | throwError "not in proof mode"
+  let_expr sep _ _ A Q := G | return none
+  let .some ⟨_, hyps⟩ := parseHypsFromShallow? u prop bi hyp | return none
+  let some ⟨_inst, P', hyps, _out, _ty, b, _, pf⟩ ←
     hyps.removeG false fun _ _ _ ty => do
       -- logInfo m!"ty: ${ty}, A: ${A}"
       if ← withReducible <| isDefEq ty A then return some ty else return none
     | return none
-  have : $ty =Q $A := ⟨⟩
-  have : $out =Q iprop(□?$b $ty) := ⟨⟩
-  let m : Q($P' ⊢ $Q) ← mkFreshExprSyntheticOpaqueMVar <|
+  let m ← mkFreshExprSyntheticOpaqueMVar <|
     IrisGoal.toExpr { prop, bi, hyps := hyps, goal := Q }
-  let pf := q(cancel $pf $m)
+
+  let pf := mkApp9 (.const ``cancel [u]) prop bi b hyp P' A Q pf m
   goal.assign pf
   return .some ([m.mvarId!], [])
 
@@ -90,9 +91,10 @@ theorem true_tac [BI PROP] (P : PROP)
 @[irun_tac True]
 def irunTrue : IRunTacticType := fun goal _config => do profileitM Exception "irunTrue" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
-  let some { prop:=prop, bi:=bi, hyps:=_, e, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
-  let ~q(iprop(True)) := G | return none
-  let pf := q(@true_tac $prop $bi $e)
+  let some { u, prop, bi, hyp, goal:=G } := parseIrisGoalShallow? g | throwError "not in proof mode"
+  let_expr BIBase.pure _ _ P := G | return none
+  let_expr True := P | return none
+  let pf := mkApp3 (.const ``true_tac [u]) prop bi hyp
   goal.assign pf
   return .some ([], [])
 
@@ -116,8 +118,8 @@ def wpsimp {α : Type _} [BI PROP] (_ : Lean.Name) (a : α) (P : α -> PROP) : P
 @[irun_tac wpsimp _ _ _]
 def irunSimp : IRunTacticType := fun goal _config => do profileitM Exception "irunSimp" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
-  let some ig := parseIrisGoal? g | throwError "not in proof mode"
-  let { prop:=_, bi:=_, e:=_, hyps:=_, goal:=G } := ig
+  let some ig := parseIrisGoalShallow? g | throwError "not in proof mode"
+  let G := ig.goal
 
   let .true := G.isAppOfArity ``wpsimp 6 | return none
   let n : Name ← reduceEval (G.getArg! 3)
@@ -270,8 +272,8 @@ open Lean Elab Tactic Meta Qq BI Std ProofMode
 @[irun_tac wpsubst _ _ _ _]
 def irunSubst : IRunTacticType := fun goal _config => do profileitM Exception "irunSubst" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
-  let some ig := parseIrisGoal? g | throwError "not in proof mode"
-  let { prop:=_, bi:=_, e:=_, hyps:=_, goal:=G } := ig
+  let some ig := parseIrisGoalShallow? g | throwError "not in proof mode"
+  let G := ig.goal
 
   let .true := G.isAppOfArity ``wpsubst 5 | return none
   let some x := Reify.Binder.reify (G.getArg! 1) | return none

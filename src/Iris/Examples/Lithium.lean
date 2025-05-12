@@ -314,9 +314,10 @@ theorem inhale_atom_with_ref_tac {α : Type _} [BI PROP] {P : PROP} (A : Atom PR
 @[irun_tac (inhaleR (atom_with_ref _ _)) _]
 def irunInhaleAtomWithRef : IRunTacticType := fun goal _config => do profileitM Exception "irunInhaleAtomWithRef" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
-  let some { prop, bi, e, hyps, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
+  let some { u, prop, bi, hyp, goal:=G } := parseIrisGoalShallow? g | throwError "not in proof mode"
   let_expr inhaleR _ _ _ L E := G | return none
   let_expr atom_with_ref _ α A a := L | return none
+  let .some ⟨e, hyps⟩ := parseHypsFromShallow? u prop bi hyp | return none
   let us := L.getAppFn.constLevels!
   let ident ← `(binderIdent| _)
   let goals ← IO.mkRef #[]
@@ -341,10 +342,11 @@ theorem inhale_pers_atom_with_ref_tac {α : Type _} [BI PROP] {P : PROP} (A : At
 @[irun_tac (inhaleR (pers (atom_with_ref _ _))) _]
 def irunInhalePersAtomWithRef : IRunTacticType := fun goal _config => do profileitM Exception "irunInhaleAtomWithRef" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
-  let some { u, prop, bi, e, hyps, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
+  let some { u, prop, bi, hyp, goal:=G } := parseIrisGoalShallow? g | throwError "not in proof mode"
   let_expr inhaleR _ _ _ L E := G | return none
   let_expr pers _ _ _ L := L | return none
   let_expr atom_with_ref _ α A a := L | return none
+  let .some ⟨e, hyps⟩ := parseHypsFromShallow? u prop bi hyp | return none
   let us := L.getAppFn.constLevels!
   let ident ← `(binderIdent| _)
   let goals ← IO.mkRef #[]
@@ -368,7 +370,7 @@ theorem inhale_prop_tac [BI PROP] φ (P : PROP) E
 @[irun_tac inhaleR (prop _) _]
 def irunInhaleProp : IRunTacticType := fun goal _config => do profileitM Exception "irunInhaleProp" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
-  let some { u, prop:=prop, bi:=bi, e, hyps:=hyps, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
+  let some { u, prop, bi, hyp, goal:=G } := parseIrisGoalShallow? g | throwError "not in proof mode"
   let_expr inhaleR _ _ _ L E := G | return none
   let_expr prop _ _ φ := L | return none
   let n ← mkFreshUserName (.mkStr1 "h")
@@ -376,9 +378,9 @@ def irunInhaleProp : IRunTacticType := fun goal _config => do profileitM Excepti
     -- TODO: iintros has this, what does this do?
     -- addLocalVarInfo ref (← getLCtx) x α
     let m ← mkFreshExprSyntheticOpaqueMVar <|
-      IrisGoal.toExpr { prop, bi, hyps, goal := Expr.beta E #[mkConst ``Unit.unit] }
+        IrisGoalShallow.toExpr { u, prop, bi, hyp, goal := Expr.beta E #[mkConst ``Unit.unit]}
     let mbound ← mkLambdaFVars #[x] m
-    let pf := mkApp6 (.const ``inhale_prop_tac [u]) prop bi φ e E mbound
+    let pf := mkApp6 (.const ``inhale_prop_tac [u]) prop bi φ hyp E mbound
     goal.assign pf
     return m.mvarId!
   let res ← try
@@ -413,9 +415,10 @@ theorem exhale_atom_direct_tac {α : Type _} [BI PROP] {p : Bool} {P P' : PROP} 
 @[irun_tac exhaleR (atom _) _]
 def irunExhaleAtomDirect : IRunTacticType := fun goal _config => do profileitM Exception "irunExhaleAtomDirect" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
-  let some { prop, bi, e, hyps, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
+  let .some {u, prop, bi, hyp, goal:=G} := parseIrisGoalShallow? g | throwError "not in proof mode"
   let_expr exhaleR _ _ _ L E := G | return none
   let_expr atom _ α A := L | return none
+  let .some ⟨e, hyps⟩ := parseHypsFromShallow? u prop bi hyp | return none
   let us := L.getAppFn.constLevels!
   let some ⟨a, P', hyps, _out, _ty, b, _, pf⟩ ←
     hyps.removeG false fun _ _ _ ty => do
@@ -439,9 +442,10 @@ theorem exhale_atom_cancel_tac {α : Type _} [BI PROP] {p : Bool} {P P' Q : PROP
 @[irun_tac 20 | exhaleR (atom _) _]
 def irunExhaleAtomCancel : IRunTacticType := fun goal config => do profileitM Exception "irunExhaleAtomCancel" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
-  let some { prop, bi, e, hyps, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
+  let some { u, prop, bi, hyp, goal:=G } := parseIrisGoalShallow? g | throwError "not in proof mode"
   let_expr exhaleR _ _ _ L E := G | return none
   let_expr atom _ α A := L | return none
+  let .some ⟨e, hyps⟩ := parseHypsFromShallow? u prop bi hyp | return none
   let us := L.getAppFn.constLevels!
   let tree := irunExt.getState (← getEnv)
   let some ⟨(m, goals, shelved), P', _hyps, out, _ty, b, _, pf⟩ ←
@@ -475,13 +479,13 @@ theorem exhale_prop_tac [BI PROP] (P : PROP) (φ : Prop) E
 @[irun_tac 20 | exhaleR (prop _) _]
 def irunExhaleProp : IRunTacticType := fun goal _config => do profileitM Exception "irunExhaleProp" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
-  let some { u, prop, bi, e, hyps, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
+  let some { u, prop, bi, hyp, goal:=G } := parseIrisGoalShallow? g | throwError "not in proof mode"
   let_expr exhaleR _ _ _ L E := G | return none
   let_expr prop _ _ P := L | return none
   let mP ← mkFreshExprSyntheticOpaqueMVar P
   let m ← mkFreshExprSyntheticOpaqueMVar <|
-      IrisGoal.toExpr { prop, bi, hyps, goal := Expr.beta E #[mkConst ``Unit.unit] }
-  let pf := mkApp7 (.const ``exhale_prop_tac [u]) prop bi e P E mP m
+      IrisGoalShallow.toExpr { u, prop, bi, hyp, goal := Expr.beta E #[mkConst ``Unit.unit] }
+  let pf := mkApp7 (.const ``exhale_prop_tac [u]) prop bi hyp P E mP m
   goal.assign pf
   return .some ([m.mvarId!], [mP.mvarId!])
 
@@ -493,16 +497,16 @@ theorem all_tac [BI PROP] {α : Type _} (P : PROP) E
 @[irun_tac allR _]
 def irunAll : IRunTacticType := fun goal _config => do profileitM Exception "irunAll" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
-  let some { prop:=prop, bi:=bi, e, hyps:=hyps, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
+  let some { u, prop, bi, hyp, goal:=G } := parseIrisGoalShallow? g | throwError "not in proof mode"
   let_expr allR _ _ α E := G | return none
   -- TODO: can we generate better names?
   let n ← mkFreshUserName (.mkStr1 "x")
   let m ← withLocalDeclD n α fun x => do
     -- addLocalVarInfo ref (← getLCtx) x α
     let m ← mkFreshExprSyntheticOpaqueMVar <|
-      IrisGoal.toExpr { prop, bi, hyps, goal := Expr.beta E #[x] }
+      IrisGoalShallow.toExpr { u, prop, bi, hyp, goal := Expr.beta E #[x] }
     let mbound ← mkLambdaFVars #[x] m
-    let pf := mkApp6 (.const ``all_tac G.getAppFn.constLevels!) prop bi α e E mbound
+    let pf := mkApp6 (.const ``all_tac G.getAppFn.constLevels!) prop bi α hyp E mbound
     goal.assign pf
     return m
   return .some ([m.mvarId!], [])
@@ -513,9 +517,9 @@ theorem done_tac [BI PROP] (P : PROP)
 @[irun_tac doneR]
 def irunDone : IRunTacticType := fun goal _config => do profileitM Exception "irunDone" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
-  let some { prop:=prop, bi:=bi, hyps:=_, e, goal:=G } := parseIrisGoal? g | throwError "not in proof mode"
+  let some { u:=_, prop, bi, hyp, goal:=G } := parseIrisGoalShallow? g | throwError "not in proof mode"
   let .true := G.isAppOfArity ``doneR 2 | return none
-  let pf := mkApp3 (.const ``done_tac G.getAppFn.constLevels!) prop bi e
+  let pf := mkApp3 (.const ``done_tac G.getAppFn.constLevels!) prop bi hyp
   goal.assign pf
   return .some ([], [])
 
@@ -529,13 +533,13 @@ theorem branch_tac [BI PROP] P (E1 E2 : PROP)
 @[irun_tac branchR _ _]
 def irunBranch : IRunTacticType := fun goal _config => do profileitM Exception "irunBranch" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
-  let some ig := parseIrisGoal? g | throwError "not in proof mode"
-  let { u, prop, bi, e, hyps:=_, goal:=G } := ig
+  let some ig := parseIrisGoalShallow? g | throwError "not in proof mode"
+  let { u, prop, bi, hyp, goal:=G } := ig
 
   let_expr branchR _ _ E1 E2 := G | return none
-  let m1 ← mkFreshExprSyntheticOpaqueMVar <| IrisGoal.toExpr { ig with goal := E1 }
-  let m2 ← mkFreshExprSyntheticOpaqueMVar <| IrisGoal.toExpr { ig with goal := E2 }
-  let pf := mkApp7 (.const ``branch_tac [u]) prop bi e E1 E2 m1 m2
+  let m1 ← mkFreshExprSyntheticOpaqueMVar <| IrisGoalShallow.toExpr { ig with goal := E1 }
+  let m2 ← mkFreshExprSyntheticOpaqueMVar <| IrisGoalShallow.toExpr { ig with goal := E2 }
+  let pf := mkApp7 (.const ``branch_tac [u]) prop bi hyp E1 E2 m1 m2
   goal.assign pf
   return .some ([m1.mvarId!, m2.mvarId!], [])
 
@@ -560,8 +564,8 @@ theorem lif_branch [BI PROP] {cond : Prop} (E1 E2 : PROP) :
 @[irun_tac simpR _ _ _ _]
 def irunSimp : IRunTacticType := fun goal _config => do profileitM Exception "irunSimp" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
-  let some ig := parseIrisGoal? g | throwError "not in proof mode"
-  let { prop:=_, bi:=_, e:=_, hyps:=_, goal:=G } := ig
+  let some ig := parseIrisGoalShallow? g | throwError "not in proof mode"
+  let G := ig.goal
 
   let_expr simpR _ _ _ n dodsimp e E := G | return none
   let n : Name ← reduceEval n
@@ -810,8 +814,8 @@ open Lean Elab Tactic Meta Qq BI Std ProofMode
 @[irun_tac subst_okR _ _ _ _]
 def irunSubst : IRunTacticType := fun goal _config => do profileitM Exception "irunSubst" (← getOptions) do
   let g ← instantiateMVars <| ← goal.getType
-  let some ig := parseIrisGoal? g | throwError "not in proof mode"
-  let { prop:=_, bi:=_, e:=_, hyps:=_, goal:=G } := ig
+  let some ig := parseIrisGoalShallow? g | throwError "not in proof mode"
+  let G := ig.goal
 
   let_expr subst_okR _ x v e E := G | return none
   let some x := Reify.Binder.reify x | return none
