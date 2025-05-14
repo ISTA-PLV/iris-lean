@@ -92,6 +92,7 @@ def atom (A : Atom PROP α) : InEx PROP α := InEx.mk A.ref
 def atom_with_ref (A : Atom PROP α) (a : α) : InEx PROP Unit := .mk λ _ => iprop(A # a)
 def prop (P : Prop) : InEx PROP Unit := .mk λ _ => iprop(⌜P⌝)
 def pers (L : InEx PROP α) : InEx PROP α := .mk λ a => iprop(□ L.body a)
+def persLi (G : Li PROP α) : InEx PROP Unit := .mk λ _ => iprop(□ G.run λ _ => iprop(True))
 
 end InEx
 
@@ -214,6 +215,18 @@ def lif (P : Prop) (G1 G2 : Li PROP α) : Li PROP α := {
     mysorry
 }
 
+def dropSpatialR (G : PROP) : PROP :=
+  iprop(□ G)
+
+@[irun_preprocess]
+def dropSpatial (G : Li PROP α) : Li PROP α := {
+  run E := dropSpatialR (G.run E)
+  mono' E1 E2 := by
+    dsimp
+    iintro HE Hwand
+    mysorry
+}
+
 def simpR {α : Type _} [BI PROP] (_ : Lean.Name) (_dsimp : Bool) (a : α) (E : α → PROP) : PROP := E a
 
 @[irun_preprocess]
@@ -305,6 +318,12 @@ end Iris.Lithium
 namespace Iris.ProofMode
 open Lean Elab Tactic Meta Qq BI Std Lithium
 
+@[irun]
+theorem inhale_atom [BI PROP] {α : Type _} A (E : α → PROP) :
+   inhaleR (atom A) E ⊣ allR λ a => inhaleR (atom_with_ref A a) λ _ => E a :=
+   by mysorry
+
+
 theorem inhale_atom_with_ref_tac {α : Type _} [BI PROP] {P : PROP} (A : Atom PROP α) (a : α) (E : Unit → PROP)
   (_h : P ∗ A # a ⊢ E ())
  : P ⊢ (inhaleR (atom_with_ref A a)) E := by
@@ -313,12 +332,11 @@ theorem inhale_atom_with_ref_tac {α : Type _} [BI PROP] {P : PROP} (A : Atom PR
 
 @[irun_tac (inhaleR (atom_with_ref _ _)) _]
 def irunInhaleAtomWithRef : IRunTacticType := fun goal _config => do profileitM Exception "irunInhaleAtomWithRef" (← getOptions) do
-  let g ← instantiateMVars <| ← goal.getType
-  let some { u, prop, bi, hyp, goal:=G } := parseIrisGoalShallow? g | throwError "not in proof mode"
+  let { u, prop, bi, hyp, goal:=G } := goal
   let_expr inhaleR _ _ _ L E := G | return none
   let_expr atom_with_ref _ α A a := L | return none
   let .some ⟨e, hyps⟩ := parseHypsFromShallow? u prop bi hyp | return none
-  let us := L.getAppFn.constLevels!
+  let us := L.getAppFn'.constLevels!
   let ident ← `(binderIdent| _)
   let goals ← IO.mkRef #[]
   let Q := Expr.beta E #[mkConst ``Unit.unit]
@@ -329,8 +347,7 @@ def irunInhaleAtomWithRef : IRunTacticType := fun goal _config => do profileitM 
     goals.modify (·.push m.mvarId!)
     return m
   let pf := mkApp8 (.const ``inhale_atom_with_ref_tac us) prop α bi e A a E pf
-  goal.assign pf
-  return .some ((← goals.get).toList, [])
+  return .some (pf, (← goals.get).toList, [])
 
 theorem inhale_pers_atom_with_ref_tac {α : Type _} [BI PROP] {P : PROP} (A : Atom PROP α) (a : α) (E : Unit → PROP)
   (_h : P ∗ □ A # a ⊢ E ())
@@ -341,13 +358,12 @@ theorem inhale_pers_atom_with_ref_tac {α : Type _} [BI PROP] {P : PROP} (A : At
 -- TODO: unify with irunInhaleAtomWithRef?
 @[irun_tac (inhaleR (pers (atom_with_ref _ _))) _]
 def irunInhalePersAtomWithRef : IRunTacticType := fun goal _config => do profileitM Exception "irunInhaleAtomWithRef" (← getOptions) do
-  let g ← instantiateMVars <| ← goal.getType
-  let some { u, prop, bi, hyp, goal:=G } := parseIrisGoalShallow? g | throwError "not in proof mode"
+  let { u, prop, bi, hyp, goal:=G } := goal
   let_expr inhaleR _ _ _ L E := G | return none
   let_expr pers _ _ _ L := L | return none
   let_expr atom_with_ref _ α A a := L | return none
   let .some ⟨e, hyps⟩ := parseHypsFromShallow? u prop bi hyp | return none
-  let us := L.getAppFn.constLevels!
+  let us := L.getAppFn'.constLevels!
   let ident ← `(binderIdent| _)
   let goals ← IO.mkRef #[]
   let Q := Expr.beta E #[mkConst ``Unit.unit]
@@ -359,8 +375,7 @@ def irunInhalePersAtomWithRef : IRunTacticType := fun goal _config => do profile
     goals.modify (·.push m.mvarId!)
     return m
   let pf := mkApp8 (.const ``inhale_pers_atom_with_ref_tac us) prop α bi e A a E pf
-  goal.assign pf
-  return .some ((← goals.get).toList, [])
+  return .some (pf, (← goals.get).toList, [])
 
 theorem inhale_prop_tac [BI PROP] φ (P : PROP) E
   (_h : φ → P ⊢ E ())
@@ -369,27 +384,25 @@ theorem inhale_prop_tac [BI PROP] φ (P : PROP) E
 
 @[irun_tac inhaleR (prop _) _]
 def irunInhaleProp : IRunTacticType := fun goal _config => do profileitM Exception "irunInhaleProp" (← getOptions) do
-  let g ← instantiateMVars <| ← goal.getType
-  let some { u, prop, bi, hyp, goal:=G } := parseIrisGoalShallow? g | throwError "not in proof mode"
+  let { u, prop, bi, hyp, goal:=G } := goal
   let_expr inhaleR _ _ _ L E := G | return none
   let_expr prop _ _ φ := L | return none
   let n ← mkFreshUserName (.mkStr1 "h")
-  let m ← withLocalDeclD n φ fun x => do
+  let (pf, m) ← withLocalDeclD n φ fun x => do
     -- TODO: iintros has this, what does this do?
     -- addLocalVarInfo ref (← getLCtx) x α
     let m ← mkFreshExprSyntheticOpaqueMVar <|
         IrisGoalShallow.toExpr { u, prop, bi, hyp, goal := Expr.beta E #[mkConst ``Unit.unit]}
     let mbound ← mkLambdaFVars #[x] m
     let pf := mkApp6 (.const ``inhale_prop_tac [u]) prop bi φ hyp E mbound
-    goal.assign pf
-    return m.mvarId!
+    return (pf, m.mvarId!)
   let res ← try
       let tac ← `(tactic|simp [*, irun_simp] at $(mkIdent n):ident)
       evalTacticAtRaw tac m
     catch _e =>
       --logInfo m!"{e.toMessageData}"
       .pure [m]
-  if res == [] then return .some ([], [])
+  if res == [] then return .some (pf, [], [])
   let [m] := res | throwError "simp created too many subgoals"
   let mvars ← m.withContext do
     let some d := (← getLCtx).findFromUserName? n | throwError "cannot find freshly generated name"
@@ -401,7 +414,12 @@ def irunInhaleProp : IRunTacticType := fun goal _config => do profileitM Excepti
       let res ← m.cases d.fvarId
       return res.toList.map (·.mvarId)
     return r?.elim [m] id
-  return .some (mvars, [])
+  return .some (pf, mvars, [])
+
+@[irun]
+theorem exhale_atom_with_ref [BI PROP] {α : Type _} (A : Atom PROP α) a (E : Unit → PROP) :
+   exhaleR (atom_with_ref A a) E ⊣ exhaleR (atom A) λ a' => exhaleR (prop (a = a')) λ _ => E () :=
+   by mysorry
 
 
 theorem exhale_atom_direct_tac {α : Type _} [BI PROP] {p : Bool} {P P' : PROP} (A : Atom PROP α) (a : α) {E}
@@ -414,12 +432,11 @@ theorem exhale_atom_direct_tac {α : Type _} [BI PROP] {p : Bool} {P P' : PROP} 
 
 @[irun_tac exhaleR (atom _) _]
 def irunExhaleAtomDirect : IRunTacticType := fun goal _config => do profileitM Exception "irunExhaleAtomDirect" (← getOptions) do
-  let g ← instantiateMVars <| ← goal.getType
-  let .some {u, prop, bi, hyp, goal:=G} := parseIrisGoalShallow? g | throwError "not in proof mode"
+  let {u, prop, bi, hyp, goal:=G} := goal
   let_expr exhaleR _ _ _ L E := G | return none
   let_expr atom _ α A := L | return none
   let .some ⟨e, hyps⟩ := parseHypsFromShallow? u prop bi hyp | return none
-  let us := L.getAppFn.constLevels!
+  let us := L.getAppFn'.constLevels!
   let some ⟨a, P', hyps, _out, _ty, b, _, pf⟩ ←
     hyps.removeG false fun _ _ _ ty => do
       let_expr Atom.ref _ _ A' a := ty | return none
@@ -430,8 +447,7 @@ def irunExhaleAtomDirect : IRunTacticType := fun goal _config => do profileitM E
   let m ← mkFreshExprSyntheticOpaqueMVar <|
     IrisGoal.toExpr { prop, bi, hyps := hyps, goal := Expr.beta E #[a] }
   let pf := mkApp11 (.const ``exhale_atom_direct_tac us) prop α bi b e P' A a E pf m
-  goal.assign pf
-  return .some ([m.mvarId!], [])
+  return .some (pf, [m.mvarId!], [])
 
 theorem exhale_atom_cancel_tac {α : Type _} [BI PROP] {p : Bool} {P P' Q : PROP} (A : Atom PROP α) {E}
   (_hP : P ⊣⊢ P' ∗ □?p Q)
@@ -439,28 +455,25 @@ theorem exhale_atom_cancel_tac {α : Type _} [BI PROP] {p : Bool} {P P' Q : PROP
  : P ⊢ exhaleR (atom A) E := by
    mysorry
 
-@[irun_tac:high exhaleR (atom _) _]
+-- below default priority for direct cancelation since direct cancellation can be a lot faster
+@[irun_tac:mid exhaleR (atom _) _]
 def irunExhaleAtomCancel : IRunTacticType := fun goal config => do profileitM Exception "irunExhaleAtomCancel" (← getOptions) do
-  let g ← instantiateMVars <| ← goal.getType
-  let some { u, prop, bi, hyp, goal:=G } := parseIrisGoalShallow? g | throwError "not in proof mode"
+  let { u, prop, bi, hyp, goal:=G } := goal
   let_expr exhaleR _ _ _ L E := G | return none
   let_expr atom _ α A := L | return none
   let .some ⟨e, hyps⟩ := parseHypsFromShallow? u prop bi hyp | return none
   let hyp' := ← mkFreshExprMVar (.some prop)
-  let us := L.getAppFn.constLevels!
+  let us := L.getAppFn'.constLevels!
   let tree := irunExt.getState (← getEnv)
-  let some ⟨(m, goals, shelved), P', hyps, _out, ty, b, _, pf⟩ ←
+  let some ⟨(tacpf, goals, shelved), P', hyps, _out, ty, b, _, pf⟩ ←
     hyps.removeG false fun _ _ _ Q => do
-      let m ← mkFreshExprSyntheticOpaqueMVar <|
-        IrisGoalShallow.toExpr { u, prop, bi, hyp := hyp', goal := mkApp6 (.const ``cancelR us) prop bi α Q A E }
-      let (progress, goals, shelved) ← irunSearch config m.mvarId! tree
-      if !progress then return none
-      return (m, goals, shelved)
+      let ig' := { u, prop, bi, hyp := hyp', goal := mkApp6 (.const ``cancelR us) prop bi α Q A E }
+      let .some (pf, goals, shelved) ← irunSearch config ig' tree | return none
+      return (pf, goals, shelved)
     | return none
   hyp'.mvarId!.assign hyps.tm
-  let pf := mkApp11 (.const ``exhale_atom_cancel_tac us) prop α bi b e P' ty A E pf m
-  goal.assign pf
-  return .some (goals, shelved)
+  let pf := mkApp11 (.const ``exhale_atom_cancel_tac us) prop α bi b e P' ty A E pf tacpf
+  return .some (pf, goals, shelved)
 
 @[irun]
 theorem cancel_match [BI PROP] {α : Type _} (A : Atom PROP α) a E :
@@ -480,16 +493,14 @@ theorem exhale_prop_tac [BI PROP] (P : PROP) (φ : Prop) E
 
 @[irun_tac:low exhaleR (prop _) _]
 def irunExhaleProp : IRunTacticType := fun goal _config => do profileitM Exception "irunExhaleProp" (← getOptions) do
-  let g ← instantiateMVars <| ← goal.getType
-  let some { u, prop, bi, hyp, goal:=G } := parseIrisGoalShallow? g | throwError "not in proof mode"
+  let { u, prop, bi, hyp, goal:=G } := goal
   let_expr exhaleR _ _ _ L E := G | return none
   let_expr prop _ _ P := L | return none
   let mP ← mkFreshExprSyntheticOpaqueMVar P
   let m ← mkFreshExprSyntheticOpaqueMVar <|
       IrisGoalShallow.toExpr { u, prop, bi, hyp, goal := Expr.beta E #[mkConst ``Unit.unit] }
   let pf := mkApp7 (.const ``exhale_prop_tac [u]) prop bi hyp P E mP m
-  goal.assign pf
-  return .some ([m.mvarId!], [mP.mvarId!])
+  return .some (pf, [m.mvarId!], [mP.mvarId!])
 
 theorem all_tac [BI PROP] {α : Type _} (P : PROP) E
   (_h : ∀ a : α, P ⊢ E a)
@@ -498,32 +509,28 @@ theorem all_tac [BI PROP] {α : Type _} (P : PROP) E
 
 @[irun_tac allR _]
 def irunAll : IRunTacticType := fun goal _config => do profileitM Exception "irunAll" (← getOptions) do
-  let g ← instantiateMVars <| ← goal.getType
-  let some { u, prop, bi, hyp, goal:=G } := parseIrisGoalShallow? g | throwError "not in proof mode"
+  let { u, prop, bi, hyp, goal:=G } := goal
   let_expr allR _ _ α E := G | return none
   -- TODO: can we generate better names?
   let n ← mkFreshUserName (.mkStr1 "x")
-  let m ← withLocalDeclD n α fun x => do
+  let (pf, m) ← withLocalDeclD n α fun x => do
     -- addLocalVarInfo ref (← getLCtx) x α
     let m ← mkFreshExprSyntheticOpaqueMVar <|
       IrisGoalShallow.toExpr { u, prop, bi, hyp, goal := Expr.beta E #[x] }
     let mbound ← mkLambdaFVars #[x] m
-    let pf := mkApp6 (.const ``all_tac G.getAppFn.constLevels!) prop bi α hyp E mbound
-    goal.assign pf
-    return m
-  return .some ([m.mvarId!], [])
+    let pf := mkApp6 (.const ``all_tac G.getAppFn'.constLevels!) prop bi α hyp E mbound
+    return (pf, m)
+  return .some (pf, [m.mvarId!], [])
 
 theorem done_tac [BI PROP] (P : PROP)
  : P ⊢ doneR := pure_intro .intro
 
 @[irun_tac doneR]
 def irunDone : IRunTacticType := fun goal _config => do profileitM Exception "irunDone" (← getOptions) do
-  let g ← instantiateMVars <| ← goal.getType
-  let some { u:=_, prop, bi, hyp, goal:=G } := parseIrisGoalShallow? g | throwError "not in proof mode"
+  let { u:=_, prop, bi, hyp, goal:=G } := goal
   let .true := G.isAppOfArity ``doneR 2 | return none
-  let pf := mkApp3 (.const ``done_tac G.getAppFn.constLevels!) prop bi hyp
-  goal.assign pf
-  return .some ([], [])
+  let pf := mkApp3 (.const ``done_tac G.getAppFn'.constLevels!) prop bi hyp
+  return .some (pf, [], [])
 
 theorem branch_tac [BI PROP] P (E1 E2 : PROP)
   (_ : P ⊢ E1)
@@ -534,16 +541,14 @@ theorem branch_tac [BI PROP] P (E1 E2 : PROP)
 
 @[irun_tac branchR _ _]
 def irunBranch : IRunTacticType := fun goal _config => do profileitM Exception "irunBranch" (← getOptions) do
-  let g ← instantiateMVars <| ← goal.getType
-  let some ig := parseIrisGoalShallow? g | throwError "not in proof mode"
+  let ig := goal
   let { u, prop, bi, hyp, goal:=G } := ig
 
   let_expr branchR _ _ E1 E2 := G | return none
   let m1 ← mkFreshExprSyntheticOpaqueMVar <| IrisGoalShallow.toExpr { ig with goal := E1 }
   let m2 ← mkFreshExprSyntheticOpaqueMVar <| IrisGoalShallow.toExpr { ig with goal := E2 }
   let pf := mkApp7 (.const ``branch_tac [u]) prop bi hyp E1 E2 m1 m2
-  goal.assign pf
-  return .some ([m1.mvarId!, m2.mvarId!], [])
+  return .some (pf, [m1.mvarId!, m2.mvarId!], [])
 
 
 @[irun]
@@ -565,18 +570,18 @@ theorem lif_branch [BI PROP] {cond : Prop} (E1 E2 : PROP) :
 
 @[irun_tac simpR _ _ _ _]
 def irunSimp : IRunTacticType := fun goal _config => do profileitM Exception "irunSimp" (← getOptions) do
-  let g ← instantiateMVars <| ← goal.getType
-  let some ig := parseIrisGoalShallow? g | throwError "not in proof mode"
+  let ig := goal
   let G := ig.goal
 
   let_expr simpR _ _ _ n dodsimp e E := G | return none
   let n : Name ← reduceEval n
   let dodsimp : Bool ← reduceEval dodsimp
   if dodsimp then
-    let ⟨e_new, _⟩ ← goal.withContext (dsimpWithExt n e)
+    let ⟨e_new, _⟩ ← dsimpWithExt n e
     let g' := {ig with goal := Expr.beta E #[e_new]}.toExpr
-    let goal' := ← goal.replaceTargetDefEq g'
-    return .some ([goal'], [])
+    let goal' ← mkFreshExprSyntheticOpaqueMVar g'
+    let pf ← mkExpectedTypeHint goal' ig.toExpr
+    return .some (pf, [goal'.mvarId!], [])
   else
     throwError "simp not implemented"
 
@@ -629,25 +634,24 @@ example (P G : Atom PROP Unit) :
 
 /-
 not reversed:
-- time with direct cancellation for 100: 756ms
-- time with direct cancellation for 200: 3011ms
-- time with generic cancellation for 100: 10884ms
-- time with generic cancellation for 200: 39206ms
+- time with direct cancellation for 100: 659ms
+- time with direct cancellation for 200: 2873ms
+- time with generic cancellation for 100: 1461ms (when creating mvars: 10884ms)
+- time with generic cancellation for 200: 5782ms (when creating mvars: 39206ms)
 reversed:
 - time is basically identical between the two versions
-  => Is mvar creation the problem?
 -/
 --set_option profiler true in
 --set_option profiler.threshold 1 in
 set_option maxRecDepth 30000 in
 set_option maxHeartbeats 2000000 in
 #time example (P : Nat → Atom PROP Unit) :
-  ⊢ inhaleR (List.foldl (λ G n => (atom_with_ref (P n) () ≫ G)) (.pure tt) (List.range 200)) λ _ =>
+  ⊢ inhaleR (List.foldl (λ G n => (atom_with_ref (P n) () ≫ G)) (.pure tt) (List.range 100)) λ _ =>
     (List.foldl (λ G n => exhaleR (atom (P n)) λ _ => G)
       (doneR) (
-    -- List.reverse makes cancellation basically instant
-    List.reverse
-    (List.range 200)))
+    -- List.reverse makes cancellation faster
+    -- List.reverse
+    (List.range 100)))
 
 :=
   by
@@ -687,15 +691,7 @@ def app_ok (v1 v2 : Val) : Li PROP Val := {
 
 -- TODO: Make this an atom?
 def natL (v : Val) : InEx PROP Nat := InEx.mk λ n => iprop(⌜v = .nat n⌝)
--- def nat_okR (v : Val) (E : Nat → PROP) : PROP :=
---   iprop(∃ n, ⌜v = .nat n⌝ ∗ E n)
-
--- -- TODO: Make this an atom?
--- @[irun_preprocess]
--- def nat_ok (v : Val) : Li PROP Nat := {
---   run := nat_okR v
---   mono' E1 E2 := by mysorry
--- }
+def pairL (v : Val) : InEx PROP (Val × Val) := InEx.mk λ p => iprop(⌜v = .pair p.1 p.2⌝)
 
 def recv_okR (v : Val) (E : Binder → Binder → Exp → PROP) : PROP :=
   iprop(∃ f x e, ⌜v = .recv f x e⌝ ∗ E f x e)
@@ -735,6 +731,29 @@ theorem natL_inhale_nat v :
     inhale (prop (v = .nat n))
     return n := by
   dsimp [inhaleR, natL]
+  intro E
+  iintro HP n Hn
+  mysorry
+
+@[irun]
+theorem pairL_exhale_pair (v1 v2 : Val) (E : (Val × Val) → PROP) :
+  exhaleR (pairL (.pair v1 v2)) E ⊣ E (v1, v2) := by
+  dsimp [exhaleR, pairL]
+  iintro HP
+  iexists (_, _)
+  isplit
+  · ipure_intro
+    rfl
+  · iassumption
+
+@[irun]
+theorem pairL_inhale_pair v :
+  inhaleR (PROP:=PROP) (pairL v) :- do
+    let v1 ← all
+    let v2 ← all
+    inhale (prop (v = .pair v1 v2))
+    return (v1, v2) := by
+  dsimp [inhaleR, pairL]
   intro E
   iintro HP n Hn
   mysorry
@@ -820,14 +839,34 @@ theorem expr_okR_if e1 e2 e3 :
     lif (n1 ≠ 0) (expr_ok e2) (expr_ok e3))
    := by mysorry
 
+@[irun]
+theorem expr_okR_fst e :
+  expr_okR (PROP:=PROP) (.fst e) :- do
+   let v ← expr_ok e
+   let (v1, _) ← exhale (pairL v)
+   return v1 := by mysorry
+
+@[irun]
+theorem expr_okR_snd e :
+  expr_okR (PROP:=PROP) (.snd e) :- do
+   let v ← expr_ok e
+   let (_, v2) ← exhale (pairL v)
+   return v2 := by mysorry
+
+@[irun]
+theorem expr_okR_pair e1 e2 :
+  expr_okR (PROP:=PROP) (.binop e1 .pair e2) :- do
+   let v1 ← expr_ok e1
+   let v2 ← expr_ok e2
+   return (.pair v1 v2) := by mysorry
+
 
 section
 open Lean Elab Tactic Meta Qq BI Std ProofMode
 
 @[irun_tac subst_okR _ _ _ _]
 def irunSubst : IRunTacticType := fun goal _config => do profileitM Exception "irunSubst" (← getOptions) do
-  let g ← instantiateMVars <| ← goal.getType
-  let some ig := parseIrisGoalShallow? g | throwError "not in proof mode"
+  let ig := goal
   let G := ig.goal
 
   let_expr subst_okR _ x v e E := G | return none
@@ -835,9 +874,9 @@ def irunSubst : IRunTacticType := fun goal _config => do profileitM Exception "i
   let e := Reify.reify e
   let e' := (Reify.subst' x v e).unreify
   let g' := {ig with goal := Expr.beta E #[e']}.toExpr
---  let ⟨g', _⟩ ← goal.withContext (dsimpWithExt `irun_simp g')
-  let goal' := ← goal.replaceTargetDefEq g'
-  return .some ([goal'], [])
+  let goal' ← mkFreshExprSyntheticOpaqueMVar g'
+  let pf ← mkExpectedTypeHint goal' ig.toExpr
+  return .some (pf, [goal'.mvarId!], [])
 
 end
 
@@ -864,7 +903,7 @@ attribute [irun_simp] Nat.add_one_sub_one
 
 -- time: ~1700ms (when using trivial for irun_solve)
 -- time: ~2559ms (when using simp for irun_solve)
-set_option profiler true in
+-- set_option profiler true in
 --set_option profiler.threshold 1 in
 #time example (P : Val -> Atom PROP Unit) :
    ⊢ (do
@@ -912,8 +951,8 @@ theorem prove_fn_spec {α : Type _} v Gpre Gpost :
   mysorry
 
 @[irun]
-theorem prove_fn_ok α β v Gpre Gpost E :
-  @fn_okR PROP _ α β v Gpre Gpost E ⊣
+theorem fn_okR_recv α β f x e Gpre Gpost E :
+  @fn_okR PROP _ α β (.recv f x e) Gpre Gpost E ⊣
    allR λ va =>
    allR λ v' =>
    allR λ Φ : Atom PROP α =>
@@ -921,7 +960,6 @@ theorem prove_fn_ok α β v Gpre Gpost E :
    -- simpR `irun_preprocess true ((Gpre va).run) λ Gpre' =>
    ((Gpre va).run) |> λ Gpre' =>
    dualizingR (λ _ => Gpre' λ a => exhaleR (atom_with_ref Φ a) λ _ => doneR) λ _ =>
-   recv_okR v λ f x e =>
    subst_okR x va e λ e =>
    subst_okR f v' e λ e =>
    -- TODO make this something like app ok such that one can use
@@ -932,6 +970,20 @@ theorem prove_fn_ok α β v Gpre Gpost E :
    -- simpR `irun_preprocess true ((Gpost a vr).run) λ Gpost =>
    ((Gpost a vr).run) |> λ Gpost =>
    Gpost E := by mysorry
+
+@[irun:mid] -- This should be tried after the .recv version
+theorem fn_okR_subsume (α β : Type _) v Gpre Gpost E :
+  @fn_okR PROP _ α β v Gpre Gpost E ⊣
+   exhaleR (atom (fn_spec v)) λ ⟨_, Gpre2, Gpost2⟩ =>
+   allR λ va =>
+   allR λ Φpre : Atom PROP α =>
+   dualizingR (λ _ => (Gpre va).run λ a => exhaleR (atom_with_ref Φpre a) λ _ => doneR) λ _ =>
+   (Gpre2 va).run λ c =>
+   exhaleR (atom Φpre) λ a =>
+   allR λ vr =>
+   dualizingR ((Gpost2 c vr).run) λ _ =>
+   (Gpost a vr).run E
+    := by mysorry
 
 -- should be applied after the inlining rule
 @[irun:low]
@@ -989,6 +1041,14 @@ theorem dualizing_done E :
 theorem dualizing_fn_ok α β E v Gpre Gpost (G : _ → _) :
   dualizingR (PROP:=PROP) (λ E => @fn_okR PROP _ α β v Gpre Gpost (G E)) E ⊣
     inhaleR (atom_with_ref (fn_spec v) ⟨_, Gpre, λ a vr => (Gpost a vr).bind λ b => fromEmpty (λ E => G E b)⟩) E
+ := by mysorry
+
+-- TODO: Allow G E instead of just E in the continuation for fn_okR?
+@[irun]
+theorem inhale_persLi_fn_ok α β E v Gpre Gpost (hmono : ∀ _ _, ⊢ _) :
+  inhaleR (PROP:=PROP)
+    (persLi (Li.mk (λ E => @fn_okR PROP _ α β v Gpre Gpost E) hmono)) E ⊣
+    inhaleR (pers (atom_with_ref (fn_spec v) ⟨_, Gpre, λ a vr => (Gpost a vr).bind λ _ => done⟩)) E
  := by mysorry
 
 example :
@@ -1059,6 +1119,249 @@ theorem fib_ok [BIAffine PROP] :
   irun
   · rename Nat => x
     cases x using fib.fun_cases <;> simp [fib] at * <;> omega
+
+
+def ptsto (v : Val) : Atom PROP Val := sorry
+
+@[irun]
+theorem expr_okR_alloc :
+  expr_okR (PROP:=PROP) .alloc :- do
+    let v ← all
+    inhale (atom_with_ref (ptsto v) (.nat 0))
+    return v := by mysorry
+
+@[irun]
+theorem expr_okR_store e1 e2 :
+  expr_okR (PROP:=PROP) (.store e1 e2) :- do
+    let v2 ← expr_ok e2
+    let v1 ← expr_ok e1
+    let _ ← exhale (atom (ptsto v1))
+    inhale (atom_with_ref (ptsto v1) v2)
+    return v2 := by mysorry
+
+@[irun]
+theorem expr_okR_load e :
+  expr_okR (PROP:=PROP) (.load e) :- do
+    let v ← expr_ok e
+    let vl ← exhale (atom (ptsto v))
+    inhale (atom_with_ref (ptsto v) vl)
+    return vl := by mysorry
+
+def ptsto_test : Exp :=
+  .lete "l" (.alloc) <|
+  .lete .anon (.store (.var "l") (.load (.var "l"))) <|
+  .var "l"
+
+example :
+  ⊢ (do
+    let v ← expr_ok (PROP:=PROP) ptsto_test
+    let vl ← exhale (atom (ptsto v) >>= natL)
+    exhale (prop (0 ≤ vl))
+    done).go := by
+  istart
+  simp [irun_preprocess, ptsto_test]
+  irun
+
+def NULL : Val := .nat 0
+
+def is_list (v : Val) : Atom PROP (List Val) := sorry
+
+@[irun]
+theorem exhaleR_is_list_NULL :
+  exhaleR (PROP:=PROP) (atom (is_list NULL)) :- return [] := by mysorry
+
+@[irun]
+theorem cancel_ptsto_list v x :
+  cancelR (PROP:=PROP) (ptsto v # x) (is_list v) :- do
+    let (v1, v2) ← exhale (pairL x)
+    let xs ← exhale (atom (is_list v2))
+    return v1 :: xs := by mysorry
+
+@[irun]
+theorem cancel_list_ptsto v xs :
+  cancelR (PROP:=PROP) (is_list v # xs) (ptsto v) :- do
+    exhale (prop (0 < xs.length))
+    let v' ← all
+    let x ← all
+    let xs' ← inhale (atom (is_list v'))
+    inhale (prop (xs = x::xs'))
+    return .pair x v' := by mysorry
+
+
+def is_null (v : Val) : Atom PROP Bool := sorry
+
+-- TODO: handle this with binop ok to allow proper overloading
+@[irun:high]
+theorem expr_okR_eq_NULL e1 :
+  expr_okR (PROP:=PROP) (Exp.binop e1 .eq (.val NULL)) :- do
+   let b ← exhale (atom (is_null (← expr_ok e1)))
+   return (Val.nat (if b then 1 else 0))
+   := by mysorry
+
+@[irun]
+theorem cancel_is_null_ptsto v v' :
+  cancelR (PROP:=PROP) (ptsto v # v') (is_null v) :- do
+    inhale (atom_with_ref (ptsto v) v')
+    return false := by mysorry
+
+@[irun]
+theorem cancel_is_null_list v xs :
+  cancelR (PROP:=PROP) (is_list v # xs) (is_null v) :- do
+    inhale (atom_with_ref (is_list v) xs)
+    return xs.isEmpty := by mysorry
+
+
+def empty_fn : Val := .recv .anon .anon (.val NULL)
+def cons_fn : Val := .recv .anon "a" <|
+  .lete "v" (.fst (.var "a")) <|
+  .lete "l" (.snd (.var "a")) <|
+  .lete "new_l" (.alloc) <|
+  .lete .anon (.store (.var "new_l") (.binop (.var "v") .pair (.var "l"))) <|
+  .var "new_l"
+
+def mklist_fn : Val := .recv .anon .anon <|
+  .lete "l" (.app (.val empty_fn) (.val (.nat 0))) <|
+  .lete "l" (.app (.val cons_fn) (.binop (.val (.nat 1)) .pair (.var "l"))) <|
+  .lete "l" (.app (.val cons_fn) (.binop (.val (.nat 2)) .pair (.var "l"))) <|
+  .var "l"
+
+theorem empty_ok [BIAffine PROP] :
+  ⊢ fn_spec (PROP:=PROP) empty_fn # ⟨_,
+    λ _ => do {return ()},
+    λ _ vr => do {let vs ← exhale (atom (is_list vr)); exhale (prop (vs = [])); done}⟩ := by
+  unfold empty_fn
+  apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
+  istart
+  simp [irun_preprocess]
+  irun
+
+theorem cons_ok [BIAffine PROP] :
+  ⊢ (fn_spec (PROP:=PROP) cons_fn) # ⟨_,
+    λ va => do {let (x, v) ← exhale (pairL va); let xs ← exhale (atom (is_list v)); return (x, xs)},
+    λ (x, xs) vr => do {let vs ← exhale (atom (is_list vr)); exhale (prop (vs = x::xs)); done}⟩ := by
+  unfold cons_fn
+  apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
+  istart
+  simp [irun_preprocess]
+  irun
+
+theorem mklist_ok [BIAffine PROP] :
+  □ fn_spec (PROP:=PROP) empty_fn # ⟨_,
+    λ _ => do {return ()},
+    λ _ vr => do {let vs ← exhale (atom (is_list vr)); exhale (prop (vs = [])); done}⟩ ∗
+  □ fn_spec (PROP:=PROP) cons_fn # ⟨_,
+    λ va => do {let (x, v) ← exhale (pairL va); let xs ← exhale (atom (is_list v)); return (x, xs)},
+    λ (x, xs) vr => do {let vs ← exhale (atom (is_list vr)); exhale (prop (vs = x::xs)); done}⟩
+  ⊢ fn_spec (PROP:=PROP) mklist_fn # ⟨_,
+    λ _ => do {return ()},
+    λ _ vr => do {let vs ← exhale (atom (is_list vr)); exhale (prop (vs = [.nat 2, .nat 1])); done}⟩ := by
+  unfold mklist_fn
+  apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
+  istart
+  iintro ⟨□ h1, □ h2⟩
+  simp [irun_preprocess]
+  irun
+
+
+def head_fn : Val := .recv .anon "l" (.fst (.load (.var "l")))
+
+theorem head_ok :
+  ⊢ fn_spec (PROP:=PROP) head_fn # ⟨_,
+    λ va => do {let xs ← exhale (atom (is_list va)); exhale (prop (0 < xs.length)); return (va, xs)},
+    λ (va, xs) vr => do {exhale (atom_with_ref (is_list va) xs); exhale (prop (xs.head? = some vr)); done}⟩ := by
+  unfold head_fn
+  apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
+  istart
+  simp [irun_preprocess]
+  irun
+
+def length_fn : Val := .recv "f" "l" <|
+  .ife (.binop (.var "l") .eq (.val NULL))
+    (.val (.nat 0)) <|
+  .lete "r" (.app (.var "f") (.snd (.load (.var "l")))) <|
+  .binop (.var "r") .plus (.val (.nat 1))
+
+theorem length_ok :
+  ⊢ fn_spec (PROP:=PROP) length_fn # ⟨_,
+    λ va => do {let xs ← exhale (atom (is_list va)); return (va, xs)},
+    λ (va, xs) vr => do {exhale (atom_with_ref (is_list va) xs); exhale (prop (vr = .nat xs.length)); done}⟩ := by
+  unfold length_fn
+  apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
+  istart
+  simp [irun_preprocess]
+  irun
+  rename List Val => xs
+  cases xs <;> simp at *
+
+def contains_fn : Val := .recv "f" "x" <|
+  .lete "l" (.fst (.var "x")) <|
+  .lete "cb" (.snd (.var "x")) <|
+  .ife (.binop (.var "l") .eq (.val NULL))
+    (.val (.nat 0)) <|
+  .ife (.app (.var "cb") (.fst (.load (.var "l"))))
+    (.val (.nat 1)) <|
+  .app (.var "f") (.binop (.snd (.load (.var "l"))) .pair (.var "cb"))
+
+@[irun]
+theorem exhaleR_persLi G :
+  exhaleR (PROP:=PROP) (persLi G) :-
+    branch (dropSpatial G) (return ()) := by
+  mysorry
+
+-- TODO: This is unsound!
+@[irun]
+theorem dropSpatialR E :
+  dropSpatialR (PROP:=PROP) E ⊣ E := by
+  mysorry
+
+def contains_spec (P : Val → Bool) : PROP :=
+  fn_spec (PROP:=PROP) contains_fn # ⟨_,
+    λ v => do
+      let (va, cb) ← exhale (pairL v)
+      let xs ← exhale (atom (is_list va))
+      exhale (persLi (fn_ok cb
+        (λ va => do {exhale (prop (va ∈ xs)); return va})
+        (λ va vr => do {exhale (prop (vr = .nat (if P va then 1 else 0))); return ()})))
+      return (va, xs),
+    λ (va, xs) vr => do
+      exhale (atom_with_ref (is_list va) xs)
+      exhale (prop (vr = .nat (if xs.any P then 1 else 0)))
+      done⟩
+
+theorem contains_ok P :
+  ⊢ contains_spec (PROP:=PROP) P := by
+  unfold contains_spec contains_fn
+  apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
+  istart
+  simp [irun_preprocess]
+  irun ∞
+  rename List Val => xs
+  cases xs <;> simp at *
+
+def contains_one_fn : Val := .recv .anon "x" <|
+  .app (.val contains_fn) (.binop (.var "x") .pair (.rece .anon "y" <| .binop (.var "y") .eq (.val (.nat 1))))
+
+-- TODO: profile this, this is slower than the Rocq version
+-- TODO: The profile says "tactic execution of Lean.Parser.Tactic.refine took 654ms". Where does this come from?
+set_option profiler true in
+#time theorem contains_one_ok :
+  □ contains_spec (λ v => v == .nat 1) ⊢ fn_spec (PROP:=PROP) contains_one_fn # ⟨_,
+    λ va => do {let xs ← exhale (atom (is_list va)); exhale (prop (∀ x ∈ xs, ∃ n, x = .nat n)); return (va, xs)},
+    λ (va, xs) vr => do {exhale (atom_with_ref (is_list va) xs); exhale (prop (vr = .nat (if Val.nat 1 ∈ xs then 1 else 0))); done}⟩ := by
+  unfold contains_spec contains_one_fn
+  apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
+  istart
+  simp [irun_preprocess]
+  iintro □h
+  irun
+--  all_goals mysorry
+  -- TODO: automate this somehow?
+  rename_i v v2 Φ Hin
+  have ⟨n, Hn⟩ : ∃ n, v = .nat n := by simp [*]
+  simp only [Hn]
+  irun
+
+
 
 
 end Iris.Examples

@@ -6,6 +6,7 @@ Authors: Michael Sammler
 import Lean
 import Qq
 import Iris.BI
+import Iris.ProofMode
 
 open Lean Elab Tactic Meta Qq Iris.BI
 
@@ -29,14 +30,34 @@ register_simp_attr irun_simp
 register_simp_attr irun_solve
 register_simp_attr irun_preprocess
 
+structure IrisGoalShallow where
+  u : Level
+  prop : Expr
+  bi : Expr
+  hyp : Expr
+  goal : Expr
+
+def IrisGoalShallow.toExpr (g : IrisGoalShallow) : Expr :=
+  mkApp4 (.const ``Entails' [g.u]) g.prop g.bi g.hyp g.goal
+
+def parseIrisGoalShallow? (expr : Expr) : Option IrisGoalShallow := do
+  let_expr Entails' prop bi hyp goal := expr | none
+  -- dbgTrace s!"{repr (expr.getAppFn')}" λ _ =>
+  let u := expr.getAppFn'.constLevels![0]!
+  some { u, prop, bi, hyp, goal }
+
+partial def parseHypsFromShallow? (u : Level) (prop : Expr) (bi : Expr) (expr : Expr) :
+    Option ((s : Expr) × @Hyps u prop bi s) := @parseHyps? u prop bi expr
+
+
 structure IRunConfig where
   debug := false
 
 declare_config_elab elabIRunConfig IRunConfig
 
-def IRunTacticType : Type := MVarId → IRunConfig → TacticM (Option (List MVarId × List MVarId))
+def IRunTacticType : Type := IrisGoalShallow → IRunConfig → TacticM (Option (Expr × List MVarId × List MVarId))
 
-def IRunTacticType.run (tac : IRunTacticType) : MVarId → IRunConfig → TacticM (Option (List MVarId × List MVarId)) := tac
+def IRunTacticType.run (tac : IRunTacticType) : IrisGoalShallow → IRunConfig → TacticM (Option (Expr × List MVarId × List MVarId)) := tac
 
 structure IRunTactic where
   tac : IRunTacticType
@@ -53,11 +74,13 @@ instance : Inhabited IRunEntry where
 
 structure IRunTacticSerialized where
   name : Name
+deriving Repr
 
 structure IRunEntrySerialized where
   tac : Name ⊕ IRunTacticSerialized
   prio : Nat
   name : Name
+deriving Repr
 instance : BEq IRunEntrySerialized where
   beq _ _ := false
 instance : Inhabited IRunEntrySerialized where
@@ -72,6 +95,7 @@ def IRunEntry.serialize (e : IRunEntry) : IRunEntrySerialized := {
 }
 
 def IRunEntrySerialized.deserialize (e : IRunEntrySerialized) : CoreM IRunEntry := do
+--  IO.println s!"deserializing {repr e}"
   let tac  ← match e.tac with
            | .inl n => .pure (.inl n)
            | .inr n => unsafe do
@@ -80,7 +104,11 @@ def IRunEntrySerialized.deserialize (e : IRunEntrySerialized) : CoreM IRunEntry 
                throwError "The tactic should have type IRunTacticType."
              -- is this the compilation the right thing to do?
              let .defnInfo d ← getConstInfo n.name | throwError "The tactic should be a definition."
-             compileDecl (.defnDecl d)
+             let decl := (.defnDecl d)
+             try
+               compileDecl decl
+             catch e =>
+               IO.println (s!"error while compiling {n.name}: {← e.toMessageData.toString}")
              let tac ← evalConst IRunTacticType n.name
              return (.inr ⟨tac, n.name⟩ : Name ⊕ IRunTactic)
   return {tac, prio := e.prio, name := e.name}

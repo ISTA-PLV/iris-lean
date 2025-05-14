@@ -305,6 +305,7 @@ def test_lithiumH (A : @Atom PROP Nat) : @LithiumM PROP _ Bool := do
 
 end Iris.Lithium
 
+/-
 namespace Iris.ProofMode
 open Lean Elab Tactic Meta Qq BI Std Lithium
 
@@ -702,3 +703,4 @@ set_option profiler true in
   irun ∞
 
 end Iris.Examples
+-/

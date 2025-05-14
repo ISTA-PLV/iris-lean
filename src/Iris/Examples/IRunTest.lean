@@ -32,8 +32,8 @@ noncomputable def PROPTest_test : PROPTest := iprop(True)
 def prop_test [BI PROP] : PROP := iprop(True)
 
 @[irun_tac:1 PROPTest_test, iprop((∃ _, ∀ _, prop_test ∗ _)), iprop((⌜_⌝ ∗ _ ∗ _) -∗ _), _ ∗ _]
-def irunTest : IRunTacticType := fun goal _config => do
-  IO.println s!"Test Tac {← ppExpr (← goal.getType)}"
+def irunTest : IRunTacticType := fun _goal _config => do
+  IO.println s!"Test Tac"
   return none
 
 theorem intro_tac [BI PROP] {P A Q : PROP}
@@ -42,8 +42,7 @@ theorem intro_tac [BI PROP] {P A Q : PROP}
 
 @[irun_tac _ -∗ _]
 def irunIntro : IRunTacticType := fun goal _config => do profileitM Exception "irunIntro" (← getOptions) do
-  let g ← instantiateMVars <| ← goal.getType
-  let some { u, prop, bi, hyp, goal:=G } := parseIrisGoalShallow? g | throwError "not in proof mode"
+  let { u, prop, bi, hyp, goal:=G } := goal
   let_expr wand _ _ A Q := G | return none
   let .some ⟨e, hyps⟩ := parseHypsFromShallow? u prop bi hyp | return none
   let ident ← `(binderIdent| _)
@@ -58,8 +57,7 @@ def irunIntro : IRunTacticType := fun goal _config => do profileitM Exception "i
     goals.modify (·.push m.mvarId!)
     return m
   let pf := mkApp6 (.const ``intro_tac [u]) prop bi e A Q pf
-  goal.assign pf
-  return .some ((← goals.get).toList, [])
+  return .some (pf, (← goals.get).toList, [])
 
 theorem cancel [BI PROP] {p : Bool} {P P' A Q' : PROP}
   (hP : P ⊣⊢ P' ∗ □?p A)
@@ -69,8 +67,7 @@ theorem cancel [BI PROP] {p : Bool} {P P' A Q' : PROP}
 
 @[irun_tac _ ∗ _]
 def irunCancel : IRunTacticType := fun goal _config => do profileitM Exception "irunCancel" (← getOptions) do
-  let g ← instantiateMVars <| ← goal.getType
-  let some { u, prop, bi, hyp, goal:=G } := parseIrisGoalShallow? g | throwError "not in proof mode"
+  let { u, prop, bi, hyp, goal:=G } := goal
   let_expr sep _ _ A Q := G | return none
   let .some ⟨_, hyps⟩ := parseHypsFromShallow? u prop bi hyp | return none
   let some ⟨_inst, P', hyps, _out, _ty, b, _, pf⟩ ←
@@ -82,21 +79,18 @@ def irunCancel : IRunTacticType := fun goal _config => do profileitM Exception "
     IrisGoal.toExpr { prop, bi, hyps := hyps, goal := Q }
 
   let pf := mkApp9 (.const ``cancel [u]) prop bi b hyp P' A Q pf m
-  goal.assign pf
-  return .some ([m.mvarId!], [])
+  return .some (pf, [m.mvarId!], [])
 
 theorem true_tac [BI PROP] (P : PROP)
  : P ⊢ True := pure_intro .intro
 
 @[irun_tac True]
 def irunTrue : IRunTacticType := fun goal _config => do profileitM Exception "irunTrue" (← getOptions) do
-  let g ← instantiateMVars <| ← goal.getType
-  let some { u, prop, bi, hyp, goal:=G } := parseIrisGoalShallow? g | throwError "not in proof mode"
+  let { u, prop, bi, hyp, goal:=G } := goal
   let_expr BIBase.pure _ _ P := G | return none
   let_expr True := P | return none
   let pf := mkApp3 (.const ``true_tac [u]) prop bi hyp
-  goal.assign pf
-  return .some ([], [])
+  return .some (pf, [], [])
 
 def lif [BI PROP] (cond : Prop) (P1 P2 : PROP) : PROP :=
   iprop((⌜cond⌝ -∗ P1) ∧ (⌜¬cond⌝ -∗ P2))
@@ -117,18 +111,18 @@ def wpsimp {α : Type _} [BI PROP] (_ : Lean.Name) (a : α) (P : α -> PROP) : P
 
 @[irun_tac wpsimp _ _ _]
 def irunSimp : IRunTacticType := fun goal _config => do profileitM Exception "irunSimp" (← getOptions) do
-  let g ← instantiateMVars <| ← goal.getType
-  let some ig := parseIrisGoalShallow? g | throwError "not in proof mode"
+  let ig := goal
   let G := ig.goal
 
   let .true := G.isAppOfArity ``wpsimp 6 | return none
   let n : Name ← reduceEval (G.getArg! 3)
   let e := G.getArg! 4
   let P := G.getArg! 5
-  let ⟨e_new, _⟩ ← goal.withContext (dsimpWithExt n e)
+  let ⟨e_new, _⟩ ← dsimpWithExt n e
   let g' := {ig with goal := Expr.beta P #[e_new]}.toExpr
-  let goal' := ← goal.replaceTargetDefEq g'
-  return .some ([goal'], [])
+  let goal' ← mkFreshExprSyntheticOpaqueMVar g'
+  let pf ← mkExpectedTypeHint goal' ig.toExpr
+  return .some (pf, [goal'.mvarId!], [])
 
 
 section test
@@ -271,8 +265,7 @@ open Lean Elab Tactic Meta Qq BI Std ProofMode
 
 @[irun_tac wpsubst _ _ _ _]
 def irunSubst : IRunTacticType := fun goal _config => do profileitM Exception "irunSubst" (← getOptions) do
-  let g ← instantiateMVars <| ← goal.getType
-  let some ig := parseIrisGoalShallow? g | throwError "not in proof mode"
+  let ig := goal
   let G := ig.goal
 
   let .true := G.isAppOfArity ``wpsubst 5 | return none
@@ -282,8 +275,9 @@ def irunSubst : IRunTacticType := fun goal _config => do profileitM Exception "i
   let e := Reify.reify (G.getArg! 3)
   let e' := (Reify.subst' x v e).unreify
   let g' := {ig with goal := Expr.beta P #[e']}.toExpr
-  let goal' := ← goal.replaceTargetDefEq g'
-  return .some ([goal'], [])
+  let goal' ← mkFreshExprSyntheticOpaqueMVar g'
+  let pf ← mkExpectedTypeHint goal' ig.toExpr
+  return .some (pf, [goal'.mvarId!], [])
 
 end
 

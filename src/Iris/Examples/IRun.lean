@@ -26,25 +26,6 @@ next steps:
 namespace Iris.ProofMode
 open Lean Elab Tactic Meta Qq BI Std
 
-structure IrisGoalShallow where
-  u : Level
-  prop : Expr
-  bi : Expr
-  hyp : Expr
-  goal : Expr
-
-def IrisGoalShallow.toExpr (g : IrisGoalShallow) : Expr :=
-  mkApp4 (.const ``Entails' [g.u]) g.prop g.bi g.hyp g.goal
-
-def parseIrisGoalShallow? (expr : Expr) : Option IrisGoalShallow := do
-  let_expr Entails' prop bi hyp goal := expr | none
-  let u := expr.getAppFn.constLevels![0]!
-  some { u, prop, bi, hyp, goal }
-
-partial def parseHypsFromShallow? (u : Level) (prop : Expr) (bi : Expr) (expr : Expr) :
-    Option ((s : Expr) × @Hyps u prop bi s) := @parseHyps? u prop bi expr
-
-
 syntax "irunsolve" : tactic
 --macro_rules
 --  | `(tactic|irunsolve) => `(tactic|trivial)
@@ -56,62 +37,60 @@ theorem irun_apply.{u} {PROP : Type u} [BI PROP] {P Q Q' : PROP}
   (h2 : P ⊢ Q')
  : P ⊢ Q := h2.trans h1
 
-def irunSearch (config : IRunConfig) (goal : MVarId) (tree : DiscrTree IRunEntry) : TacticM (Bool × List MVarId × List MVarId) := do
-  goal.withContext do
-    let mut g ← instantiateMVars <| ← goal.getType
-    let some { u, prop, bi, hyp, goal:=G } := parseIrisGoalShallow? g | throwError "not in proof mode"
-    if config.debug then logInfo m!"Goal: {G}"
-    -- logInfo m!"IN LOOP: {G}"
-    let G ← instantiateExprMVars G
-    if G.isMVar then throwError "irun failed: goal has free metavars"
-    let tacs ← tree.getMatch G
-    let tacs := tacs.insertionSort λ a b => a.prio > b.prio
-    for tac in tacs do
-      if config.debug then logInfo m!"trying {tac.name}"
-      match tac.tac with
-      | .inl decl =>
-        let info ← getConstInfo decl
-        -- TODO: create new mvar level to prevent instantiating mvars in the goal, see https://leanprover.zulipchat.com/#narrow/channel/270676-lean4/topic/Difference.20between.20DiscrTree.2EgetMatch.20and.20DiscrTree.2EgetUnify/near/513194806 ?
-        let pf := mkConst decl (← mkFreshLevelMVarsFor info)
-        let (args, _, targetTy) ← forallMetaTelescopeReducing (← inferType pf)
-        let .some (Gnew, Gdecl) := unpackEntails targetTy | throwError "theorem is not entails, this should not happen"
-        let .true ← withReducible <| isDefEq G Gdecl | continue
+def irunSearch (config : IRunConfig) (goal : IrisGoalShallow) (tree : DiscrTree IRunEntry) : TacticM (Option (Expr × List MVarId × List MVarId)) := do
+  let { u, prop, bi, hyp, goal:=G } := goal
+  if config.debug then logInfo m!"Goal: {G}"
+  -- logInfo m!"IN LOOP: {G}"
+  let G ← instantiateExprMVars G
+  if G.isMVar then throwError "irun failed: goal has free metavars"
+  let tacs ← tree.getMatch G
+  let tacs := tacs.insertionSort λ a b => a.prio > b.prio
+  for tac in tacs do
+    if config.debug then logInfo m!"trying {tac.name}"
+    match tac.tac with
+    | .inl decl =>
+      let info ← getConstInfo decl
+      -- TODO: create new mvar level to prevent instantiating mvars in the goal, see https://leanprover.zulipchat.com/#narrow/channel/270676-lean4/topic/Difference.20between.20DiscrTree.2EgetMatch.20and.20DiscrTree.2EgetUnify/near/513194806 ?
+      let pf := mkConst decl (← mkFreshLevelMVarsFor info)
+      let (args, _, targetTy) ← forallMetaTelescopeReducing (← inferType pf)
+      let .some (Gnew, Gdecl) := unpackEntails targetTy | throwError "theorem is not entails, this should not happen"
+      let .true ← withReducible <| isDefEq G Gdecl | continue
 
-        let mut do_cont := false
-        for mvar in args do
-          let mvarId := mvar.mvarId!
-          if ! (← mvarId.isAssigned) && ! (← mvarId.isDelayedAssigned) then
-            try
-              let [] ← evalTacticAtRaw (← `(tactic|irunsolve)) mvarId | throwError "solver failed"
-            catch e =>
-              if config.debug then
-                logInfo m!"[irun] error '{e.toMessageData}' when solving uninstantiated argument `{← instantiateMVars <| ← mvarId.getType}` of lemma {tac.name}"
-              do_cont := true
-              break
-        if do_cont then continue
+      let mut do_cont := false
+      for mvar in args do
+        let mvarId := mvar.mvarId!
+        if ! (← mvarId.isAssigned) && ! (← mvarId.isDelayedAssigned) then
+          try
+            let [] ← evalTacticAtRaw (← `(tactic|irunsolve)) mvarId | throwError "solver failed"
+          catch e =>
+            if config.debug then
+              logInfo m!"[irun] error '{e.toMessageData}' when solving uninstantiated argument `{← instantiateMVars <| ← mvarId.getType}` of lemma {tac.name}"
+            do_cont := true
+            break
+      if do_cont then continue
 
-        if config.debug then logInfo m!"successfully applied {tac.name}"
-        let m ← mkFreshExprSyntheticOpaqueMVar <|
-          IrisGoalShallow.toExpr { u, prop, bi, hyp, goal := Gnew }
-        let pf := mkApp7 (.const ``irun_apply [u]) prop bi hyp G Gnew (mkAppN pf args) m
-        goal.assign pf
-        return (true, [m.mvarId!], [])
-      | .inr tac =>
-        let .some (goals_new, shelved_new) ← tac.tac.run goal config | continue
-        if config.debug then logInfo m!"successfully applied {tac.name}"
-        return (true, goals_new, shelved_new)
-    return (false, [goal], [])
+      if config.debug then logInfo m!"successfully applied {tac.name}"
+      let m ← mkFreshExprSyntheticOpaqueMVar <|
+        IrisGoalShallow.toExpr { u, prop, bi, hyp, goal := Gnew }
+      let pf := mkApp7 (.const ``irun_apply [u]) prop bi hyp G Gnew (mkAppN pf args) m
+      return some (pf, [m.mvarId!], [])
+    | .inr tac =>
+      let some res ← tac.tac.run goal config | continue
+      if config.debug then logInfo m!"successfully applied {tac.name}"
+      return some res
+  return none
 
 
 --def profileitM (_ : Type) (_ : String) (_ : Options) (act : TacticM α) : TacticM α := act
 partial def irunCore (config : IRunConfig) (nsteps : Option Nat) : TacticM Unit := do profileitM Exception "irun" (← getOptions) do
   -- TODO: keep track of [IrisGoal]s instead of just MVars such that tactics can avoid reparsing
   let mut (goals, shelved) ← (← getGoals).partitionM λ m => do
-    -- if config.debug then logInfo m!"goal: {repr (← m.getType)}"
-    return (← m.getType).isAppOf ``Entails'
+    -- if config.debug then logInfo m!"goal: {repr (← m.getType).getAppFn'}"
+    -- we need to use the ' variant since some tactics insert random mdata (e.g., no implicit lambda) into the goal
+    return (← m.getType).isAppOfArity' ``Entails' 4
   -- if config.debug then
-  --   logInfo m!"goals: {goals}"
-  --   logInfo m!"shelved: {shelved}"
+  --    logInfo m!"goals: {goals}"
+  --    logInfo m!"shelved: {shelved}"
   let mut n := 0
   let tree := irunExt.getState (← getEnv)
   repeat
@@ -129,14 +108,14 @@ partial def irunCore (config : IRunConfig) (nsteps : Option Nat) : TacticM Unit 
 
       -- TODO: do we want this?
       let g ← instantiateMVars <| ← goal.getType
-      let some {u:=_, prop, bi, hyp, goal:=G} := parseIrisGoalShallow? g | throwError "not in proof mode"
-      let G' ← whnfR G
-      let g' := mkApp4 (.const ``Entails' [g.getAppFn.constLevels![0]!]) prop bi hyp G'
+      let some ig := parseIrisGoalShallow? g | throwError "not in proof mode"
+      let G' ← whnfR ig.goal
+      let g' := {ig with goal:=G'}.toExpr
       -- TODO: alternatively, we can do goal.setType g'. Does this make a difference?
-      progress_match := G != G'
+      progress_match := ig.goal != G'
       if progress_match then
         goal := ← goal.replaceTargetDefEq g'
-      if config.debug then logInfo m!"progress: {progress_match}, G: {G}, G': {G'}"
+      if config.debug then logInfo m!"progress: {progress_match}, G: {ig.goal}, G': {G'}"
 /-
       repeat do
         let g ← instantiateMVars <| ← goal.getType
@@ -166,13 +145,23 @@ partial def irunCore (config : IRunConfig) (nsteps : Option Nat) : TacticM Unit 
       goal := ← goal.replaceTargetDefEq g_new
 
     -- find a tactic or lemma to apply to the goal
-    let (progress, goals_new, shelved_new) ← irunSearch config goal tree
-    if !progress && !progress_match then
+    let res ← goal.withContext do
+      let mut g ← instantiateMVars <| ← goal.getType
+      let some ig := parseIrisGoalShallow? g | throwError "not in proof mode"
+      irunSearch config ig tree
+
+    match res with
+    | some (pf, goals_new, shelved_new) =>
+      goal.assign pf
+      goals := goals_new ++ goals'
+      shelved := shelved ++ shelved_new
+    | none =>
+      goals := goal :: goals'
+
+    if res.isNone && !progress_match then
       if config.debug then logInfo m!"no progress, exiting"
       break
     n := n+1
-    goals := goals_new ++ goals'
-    shelved := shelved ++ shelved_new
 
   if !(nsteps == .none || nsteps == .some n) then
     logInfo s!"Did {n} steps"
