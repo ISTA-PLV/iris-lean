@@ -77,14 +77,14 @@ def cancelFast {e} (hyps : Hyps bi e)
   have : $ty =Q $A := ⟨⟩
   have : $out =Q iprop(□?$b $ty) := ⟨⟩
   let m : Q($P' ⊢ $Q') ← mkFreshExprSyntheticOpaqueMVar <|
-    IrisGoal.toExpr { prop, bi, hyps := hyps, goal := Q' }
+    IrisGoal.toExpr { u, prop, bi, e:=_, hyps := hyps, goal := Q' }
   return (q(cancel $pf $m), m)
 
 elab "icancel" : tactic => do profileitM Exception "icancel" (← getOptions) do
   let mvar ← getMainGoal
   mvar.withContext do
   let g ← instantiateMVars <| ← mvar.getType
-  let some { prop:=_, bi, e:=_, hyps, goal } := parseIrisGoal? g | throwError "not in proof mode"
+  let some { u:=_, prop:=_, bi, e:=_, hyps, goal } := parseIrisGoal? g | throwError "not in proof mode"
 
   let (pf, m) ← cancelFast bi goal hyps
   mvar.assign pf
@@ -113,12 +113,12 @@ elab "ifastintro" : tactic => do profileitM Exception "ifastintro" (← getOptio
   let mvar ← getMainGoal
   mvar.withContext do
   let g ← instantiateMVars <| ← mvar.getType
-  let some { prop, bi, e := _, hyps, goal } := parseIrisGoal? g | throwError "not in proof mode"
+  let some { u, prop, bi, e := _, hyps, goal } := parseIrisGoal? g | throwError "not in proof mode"
 
   let goals ← IO.mkRef #[]
   let pf ← introFast bi goal hyps fun hyps Q => do
     let m : Expr ← mkFreshExprSyntheticOpaqueMVar <|
-      IrisGoal.toExpr { prop, bi, hyps, goal:=Q }
+      IrisGoal.toExpr { u, prop, bi, e:=_, hyps, goal:=Q }
     goals.modify (·.push m.mvarId!)
     pure m
 
@@ -138,7 +138,7 @@ elab "itrue" : tactic => do profileitM Exception "itrue" (← getOptions) do
   let mvar ← getMainGoal
   mvar.withContext do
   let g ← instantiateMVars <| ← mvar.getType
-  let some { prop:=_, bi, e := _, hyps, goal } := parseIrisGoal? g | throwError "not in proof mode"
+  let some { u:=_, prop:=_, bi, e := _, hyps, goal } := parseIrisGoal? g | throwError "not in proof mode"
 
   let pf ← trueFast bi goal hyps
   mvar.assign pf
@@ -154,14 +154,14 @@ def applyTac {e} {A B : Q($prop)} (hyps : Hyps bi e) (P : Q($A ⊢ $B))
   -- we need to instantiate mvars, so we use isDefEq
   let ⟨_⟩ ← assertDefEqQ Q B
   let m : Q($e ⊢ $A) ← mkFreshExprSyntheticOpaqueMVar <|
-    IrisGoal.toExpr { prop, bi, hyps := hyps, goal := A }
+    IrisGoal.toExpr { u, prop, bi, e:=_, hyps := hyps, goal := A }
   return (q(apply_bi $P $m), m)
 
 elab "iapply" colGt thm:term : tactic => do
   let mvar ← getMainGoal
   mvar.withContext do
   let g ← instantiateMVars <| ← mvar.getType
-  let some { prop:=prop, bi, e:=_, hyps, goal } := parseIrisGoal? g | throwError "not in proof mode"
+  let some { u, prop, bi, e:=_, hyps, goal } := parseIrisGoal? g | throwError "not in proof mode"
 
   let A : Q($prop) ← mkFreshExprMVar prop
   let B : Q($prop) ← mkFreshExprMVar prop
@@ -214,14 +214,14 @@ partial def iAutoApplyCore {e} (hyps : Hyps bi e) (tree : DiscrTree Name) :
     throwError "iautoapply failed: no lemma available")
 
   let m : Q($e ⊢ $G') ← mkFreshExprSyntheticOpaqueMVar <|
-    IrisGoal.toExpr { prop, bi, hyps := hyps, goal := G' }
+    IrisGoal.toExpr { u, prop, bi, e:=_, hyps := hyps, goal := G' }
   return (q(apply_bi $pf $m), m)
 
 elab "iautoapply" : tactic => do profileitM Exception "iautoapply" (← getOptions) do
   let mvar ← getMainGoal
   mvar.withContext do
   let g ← instantiateMVars <| ← mvar.getType
-  let some { prop:=_, bi, e:=_, hyps, goal } := parseIrisGoal? g | throwError "not in proof mode"
+  let some { u:=_, prop:=_, bi, e:=_, hyps, goal } := parseIrisGoal? g | throwError "not in proof mode"
 
   let tree := istepExt.getState (← getEnv)
 
@@ -259,7 +259,7 @@ def iLifCore {e} (hyps : Hyps bi e)
   try
     let _ ← evalTacticAt (← `(tactic|istepsolve)) mcond.mvarId!
     let m : Q($e ⊢ $P1) ← mkFreshExprSyntheticOpaqueMVar <|
-      IrisGoal.toExpr { prop, bi, hyps := hyps, goal := P1 }
+      IrisGoal.toExpr { u, prop, bi, e:=_, hyps := hyps, goal := P1 }
     return (q(lif_true $mcond $m), m)
   catch _ => pure ()
 
@@ -267,7 +267,7 @@ def iLifCore {e} (hyps : Hyps bi e)
   try
     let _ ← evalTacticAt (← `(tactic|istepsolve)) mnegcond.mvarId!
     let m : Q($e ⊢ $P2) ← mkFreshExprSyntheticOpaqueMVar <|
-      IrisGoal.toExpr { prop, bi, hyps := hyps, goal := P2 }
+      IrisGoal.toExpr { u, prop, bi, e:=_, hyps := hyps, goal := P2 }
     return (q(lif_false $mnegcond $m), m)
   catch _ => pure ()
 
@@ -277,7 +277,7 @@ elab "ilif" : tactic => do profileitM Exception "ilif" (← getOptions) do
   let mvar ← getMainGoal
   mvar.withContext do
   let g ← instantiateMVars <| ← mvar.getType
-  let some { prop:=_, bi, e:=_, hyps, goal } := parseIrisGoal? g | throwError "not in proof mode"
+  let some { u:=_, prop:=_, bi, e:=_, hyps, goal } := parseIrisGoal? g | throwError "not in proof mode"
 
   let (pf, m) ← iLifCore bi goal hyps
   mvar.assign pf
@@ -413,7 +413,7 @@ elab "isubst" : tactic => do
   let mvar ← getMainGoal
   mvar.withContext do
   let g ← instantiateMVars <| ← mvar.getType
-  let some { prop:=_, bi:=_, e:=_, hyps:=_, goal } := parseIrisGoal? g | throwError "not in proof mode"
+  let some { u:=_, prop:=_, bi:=_, e:=_, hyps:=_, goal } := parseIrisGoal? g | throwError "not in proof mode"
 
   let .true := goal.isAppOfArity ``wpsubst 5 | throwError "Goal is not 'wp_subst'"
   -- TODO: Do something smarter here?

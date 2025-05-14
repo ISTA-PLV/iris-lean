@@ -53,7 +53,7 @@ def irunIntro : IRunTacticType := fun goal _config => do profileitM Exception "i
   let goals ← IO.mkRef #[]
   let pf ← iCasesCore bi hyps Q b A A' ⟨⟩ (.one ident) fun hyps => do
     let m ← mkFreshExprSyntheticOpaqueMVar <|
-      IrisGoal.toExpr { prop, bi, hyps, goal:=Q }
+      IrisGoal.toExpr { u, prop, bi, e:=_, hyps, goal:=Q }
     goals.modify (·.push m.mvarId!)
     return m
   let pf := mkApp6 (.const ``intro_tac [u]) prop bi e A Q pf
@@ -76,7 +76,7 @@ def irunCancel : IRunTacticType := fun goal _config => do profileitM Exception "
       if ← withReducible <| isDefEq ty A then return some ty else return none
     | return none
   let m ← mkFreshExprSyntheticOpaqueMVar <|
-    IrisGoal.toExpr { prop, bi, hyps := hyps, goal := Q }
+    IrisGoal.toExpr { u, prop, bi, e:=_, hyps := hyps, goal := Q }
 
   let pf := mkApp9 (.const ``cancel [u]) prop bi b hyp P' A Q pf m
   return .some (pf, [m.mvarId!], [])
@@ -153,12 +153,13 @@ theorem proof_intro_2 [BIAffine PROP] (P : Nat → PROP) :
    by
      dsimp [List.foldl, List.range, List.range.loop] <;> (repeat iintro _) <;> iassumption
 
-
-
 -- TODO: why does ilif sometimes take more than 1ms here if there a no lif in the goal?
 --set_option profiler true in
 --set_option profiler.threshold 1 in
+set_option Elab.async false in
 set_option maxRecDepth 30000 in
+--set_option trace.profiler true in
+--set_option trace.Elab.command true in
 #time theorem proof_cancel_2 (P : Nat → PROP) :
   ⊢ (List.foldl (λ G n => iprop((P n) ∗ G)) iprop(True) (List.range 200)) -∗
     (List.foldl (λ G n => iprop(P n ∗ G)) iprop(True) (
@@ -313,8 +314,11 @@ comparison in Rocq:
 - 200 steps: 4579ms for rep liTStep, 5026ms for Qed
 - 100 steps: 1905ms for rep liTStep, 1496ms for Qed
 -/
-set_option profiler true in
+--set_option profiler true in
 --set_option profiler.threshold 1 in
+-- set_option trace.profiler true in
+-- set_option trace.Elab.command true in
+set_option Elab.async false in
 #time theorem wp_test2 (P : Val -> PROP) :
   P (.nat 0) ⊢ wp (.app (.val rec_fn) (.val (.nat 200))) (λ v => iprop(P v ∗ True)) := by
   istart

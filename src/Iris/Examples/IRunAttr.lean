@@ -52,6 +52,7 @@ partial def parseHypsFromShallow? (u : Level) (prop : Expr) (bi : Expr) (expr : 
 
 structure IRunConfig where
   debug := false
+  test := false
 
 declare_config_elab elabIRunConfig IRunConfig
 
@@ -94,21 +95,23 @@ def IRunEntry.serialize (e : IRunEntry) : IRunEntrySerialized := {
   name := e.name
 }
 
-def IRunEntrySerialized.deserialize (e : IRunEntrySerialized) : CoreM IRunEntry := do
---  IO.println s!"deserializing {repr e}"
+def IRunEntrySerialized.deserialize (e : IRunEntrySerialized) (compile : Bool) : CoreM IRunEntry := do
+  -- IO.println s!"deserializing {repr e}"
   let tac  ← match e.tac with
            | .inl n => .pure (.inl n)
            | .inr n => unsafe do
              let ty := (← getConstInfo n.name).type
              if ty != .const ``IRunTacticType [] then
                throwError "The tactic should have type IRunTacticType."
-             -- is this the compilation the right thing to do?
-             let .defnInfo d ← getConstInfo n.name | throwError "The tactic should be a definition."
-             let decl := (.defnDecl d)
-             try
-               compileDecl decl
-             catch e =>
-               IO.println (s!"error while compiling {n.name}: {← e.toMessageData.toString}")
+             if compile then
+               -- is this the compilation the right thing to do?
+               let .defnInfo d ← getConstInfo n.name | throwError "The tactic should be a definition."
+               let decl := (.defnDecl d)
+               try
+                 withOptions (λ opt => Elab.async.set opt false) <|
+                   compileDecl decl
+               catch e =>
+                 IO.println (s!"error while compiling {n.name}: {← e.toMessageData.toString}")
              let tac ← evalConst IRunTacticType n.name
              return (.inr ⟨tac, n.name⟩ : Name ⊕ IRunTactic)
   return {tac, prio := e.prio, name := e.name}
@@ -119,9 +122,11 @@ initialize irunExt :
   registerScopedEnvExtension {
     mkInitial := .pure {}
     addEntry := fun dt (n, ks) => dt.insertCore ks n
-    ofOLeanEntry := fun _ (n, ks) => ImportM.runCoreM do return (← n.deserialize, ks)
+    ofOLeanEntry := fun _ (n, ks) => ImportM.runCoreM do return (← n.deserialize (compile:=false), ks)
     toOLeanEntry := fun (n, ks) => (n.serialize, ks)
   }
+
+initialize registerTraceClass `IRun.step
 
 def unpackEntails : Expr → Option (Expr × Expr)
   | .app (.app (.app (.app (.const ``Entails _) _) _) G') G => some (G', G)
@@ -174,7 +179,7 @@ initialize unsafe registerBuiltinAttribute {
       let stx ← `(iprop($(TSyntax.mk stx)))
       Term.elabTerm stx none
 
-    let tac ← (IRunEntrySerialized.mk (.inr ⟨decl⟩) prio decl).deserialize
+    let tac ← (IRunEntrySerialized.mk (.inr ⟨decl⟩) prio decl).deserialize (compile:=true)
     for pat in pats do
       let key ← DiscrTree.mkPath pat
       irunExt.add (tac, key) kind

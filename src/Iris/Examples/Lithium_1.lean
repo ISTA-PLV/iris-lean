@@ -91,7 +91,6 @@ variable {α : Type v} {β : Type w}
 def pure (a : α) : @LithiumM PROP _ α := {
   run E := E a
   mono' E1 E2 := by
-    dsimp
     iintro HE Hwand
     ispecialize Hwand HE
     iassumption
@@ -101,7 +100,6 @@ def bind (G1 : @LithiumM PROP _ α) (G2 : α → @LithiumM PROP _ β) :
   @LithiumM PROP _ β := {
   run E := G1.run (λ a => (G2 a).run E)
   mono' E1 E2 := by
-    dsimp
     iintro HE Hwand
     sorry
 }
@@ -118,7 +116,6 @@ instance : HPure α (@LithiumM PROP _ α) where
 def exhale (L : @InExM PROP α) : @LithiumM PROP _ α := {
   run E := iprop(∃ a, L.body a ∗ E a)
   mono' E1 E2 := by
-    dsimp
     iintro ⟨a, HL, HE⟩ Hwand
     iexists a
     isplit l [HL]
@@ -130,7 +127,6 @@ def exhale (L : @InExM PROP α) : @LithiumM PROP _ α := {
 def inhale (L : @InExM PROP α) : @LithiumM PROP _ α := {
   run E := iprop(∀ a, L.body a -∗ E a)
   mono' E1 E2 := by
-    dsimp
     iintro HE Hwand a HL
     ispecialize HE HL
     ispecialize Hwand HE
@@ -140,7 +136,6 @@ def inhale (L : @InExM PROP α) : @LithiumM PROP _ α := {
 def all (α : Type v) : @LithiumM PROP _ α := {
   run E := iprop(∀ a, E a)
   mono' E1 E2 := by
-    dsimp
     iintro HE Hwand a
     ispecialize HE a
     ispecialize Hwand HE
@@ -150,7 +145,6 @@ def all (α : Type v) : @LithiumM PROP _ α := {
 def done : @LithiumM PROP _ α := {
   run E := iprop(True)
   mono' E1 E2 := by
-    dsimp
     iintro HE Hwand
     iassumption
 }
@@ -158,7 +152,6 @@ def done : @LithiumM PROP _ α := {
 def lif (P : Prop) (G1 G2 : @LithiumM PROP _ α) : @LithiumM PROP _ α := {
   run E := iprop((⌜P⌝ -∗ G1.run E) ∧ (⌜¬P⌝ -∗ G2.run E))
   mono' E1 E2 := by
-    dsimp
     iintro HE Hwand
     sorry
 }
@@ -166,7 +159,6 @@ def lif (P : Prop) (G1 G2 : @LithiumM PROP _ α) : @LithiumM PROP _ α := {
 def dsimp {α : Type _} [BI PROP] (_ : Lean.Name) (a : α) : @LithiumM PROP _ α := {
   run E := E a
   mono' E1 E2 := by
-    simp
     sorry
 }
 
@@ -176,7 +168,6 @@ def emptyP : PEmpty → PROP := λ e => nomatch e
 def dualizing (G : @LithiumM PROP _ Empty) : @LithiumM PROP _ Unit := {
   run E := iprop(G.run empty -∗ E ⟨⟩)
   mono' E1 E2 := by
-    dsimp
     iintro HE Hwand HG
     ispecialize HE HG
     ispecialize Hwand HE
@@ -186,7 +177,6 @@ def dualizing (G : @LithiumM PROP _ Empty) : @LithiumM PROP _ Unit := {
 def dualizingP (G : @LithiumM PROP _ PEmpty) : @LithiumM PROP _ PUnit := {
   run E := iprop(G.run emptyP -∗ E ⟨⟩)
   mono' E1 E2 := by
-    dsimp
     iintro HE Hwand HG
     ispecialize HE HG
     ispecialize Hwand HE

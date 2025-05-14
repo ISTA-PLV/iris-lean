@@ -40,6 +40,7 @@ theorem irun_apply.{u} {PROP : Type u} [BI PROP] {P Q Q' : PROP}
 def irunSearch (config : IRunConfig) (goal : IrisGoalShallow) (tree : DiscrTree IRunEntry) : TacticM (Option (Expr × List MVarId × List MVarId)) := do
   let { u, prop, bi, hyp, goal:=G } := goal
   if config.debug then logInfo m!"Goal: {G}"
+  withTraceNode `IRun.step (λ _ => return m!"goal: {G.getAppFn'}") do
   -- logInfo m!"IN LOOP: {G}"
   let G ← instantiateExprMVars G
   if G.isMVar then throwError "irun failed: goal has free metavars"
@@ -47,37 +48,42 @@ def irunSearch (config : IRunConfig) (goal : IrisGoalShallow) (tree : DiscrTree 
   let tacs := tacs.insertionSort λ a b => a.prio > b.prio
   for tac in tacs do
     if config.debug then logInfo m!"trying {tac.name}"
-    match tac.tac with
-    | .inl decl =>
-      let info ← getConstInfo decl
-      -- TODO: create new mvar level to prevent instantiating mvars in the goal, see https://leanprover.zulipchat.com/#narrow/channel/270676-lean4/topic/Difference.20between.20DiscrTree.2EgetMatch.20and.20DiscrTree.2EgetUnify/near/513194806 ?
-      let pf := mkConst decl (← mkFreshLevelMVarsFor info)
-      let (args, _, targetTy) ← forallMetaTelescopeReducing (← inferType pf)
-      let .some (Gnew, Gdecl) := unpackEntails targetTy | throwError "theorem is not entails, this should not happen"
-      let .true ← withReducible <| isDefEq G Gdecl | continue
+    let res ← withTraceNode `IRun.step (λ _ => return m!"trying {tac.name}") do
+      match tac.tac with
+      | .inl decl =>
+        let info ← getConstInfo decl
+        -- TODO: create new mvar level to prevent instantiating mvars in the goal, see https://leanprover.zulipchat.com/#narrow/channel/270676-lean4/topic/Difference.20between.20DiscrTree.2EgetMatch.20and.20DiscrTree.2EgetUnify/near/513194806 ?
+        let pf := mkConst decl (← mkFreshLevelMVarsFor info)
+        let (args, _, targetTy) ← forallMetaTelescopeReducing (← inferType pf)
+        let .some (Gnew, Gdecl) := unpackEntails targetTy | throwError "theorem is not entails, this should not happen"
+        let .true ← withReducible <| isDefEq G Gdecl | return none
 
-      let mut do_cont := false
-      for mvar in args do
-        let mvarId := mvar.mvarId!
-        if ! (← mvarId.isAssigned) && ! (← mvarId.isDelayedAssigned) then
-          try
-            let [] ← evalTacticAtRaw (← `(tactic|irunsolve)) mvarId | throwError "solver failed"
-          catch e =>
-            if config.debug then
-              logInfo m!"[irun] error '{e.toMessageData}' when solving uninstantiated argument `{← instantiateMVars <| ← mvarId.getType}` of lemma {tac.name}"
-            do_cont := true
-            break
-      if do_cont then continue
+        let mut do_cont := false
+        for mvar in args do
+          let mvarId := mvar.mvarId!
+          if ! (← mvarId.isAssigned) && ! (← mvarId.isDelayedAssigned) then
+            try
+              let [] ← evalTacticAtRaw (← `(tactic|irunsolve)) mvarId | throwError "solver failed"
+            catch e =>
+              if config.debug then
+                logInfo m!"[irun] error '{e.toMessageData}' when solving uninstantiated argument `{← instantiateMVars <| ← mvarId.getType}` of lemma {tac.name}"
+              do_cont := true
+              break
+        if do_cont then return none
 
-      if config.debug then logInfo m!"successfully applied {tac.name}"
-      let m ← mkFreshExprSyntheticOpaqueMVar <|
-        IrisGoalShallow.toExpr { u, prop, bi, hyp, goal := Gnew }
-      let pf := mkApp7 (.const ``irun_apply [u]) prop bi hyp G Gnew (mkAppN pf args) m
-      return some (pf, [m.mvarId!], [])
-    | .inr tac =>
-      let some res ← tac.tac.run goal config | continue
-      if config.debug then logInfo m!"successfully applied {tac.name}"
-      return some res
+        if config.debug then logInfo m!"successfully applied {tac.name}"
+        let m ← mkFreshExprSyntheticOpaqueMVar <|
+          IrisGoalShallow.toExpr { u, prop, bi, hyp, goal := Gnew }
+        let pf := mkApp7 (.const ``irun_apply [u]) prop bi hyp G Gnew (mkAppN pf args) m
+        return some (pf, [m.mvarId!], [])
+      | .inr tac =>
+        if config.test then
+          IO.println s!"running {tac.name}"
+          return none
+        let some res ← tac.tac.run goal config | return none
+        if config.debug then logInfo m!"successfully applied {tac.name}"
+        return some res
+    if res.isSome then return res
   return none
 
 

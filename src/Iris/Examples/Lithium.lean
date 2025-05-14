@@ -40,6 +40,57 @@ Next steps:
 - look into namespaces and using export
 -/
 
+namespace Iris.ProofMode
+open Lean Elab.Tactic Meta Qq BI
+
+structure PartitionHyps {prop : Q(Type u)} (bi : Q(BI $prop)) (e : Q($prop)) where
+  (espatial : Q($prop)) (hypsspatial : Hyps bi espatial)
+  (eintuit : Q($prop)) (hypsintuit : Hyps bi eintuit)
+  (pf : Q($e ⊣⊢ $espatial ∗ □ $eintuit))
+  deriving Inhabited
+
+-- TODO: use the following similar to Hyps.split?
+inductive PartitionHypsCore {prop : Q(Type u)} (bi : Q(BI $prop)) (e : Q($prop)) where
+  | none
+  | spatial
+  | intuit
+  | main (_ : PartitionHyps bi e)
+
+theorem partition_mk_emp [BI PROP] :
+    emp (PROP:=PROP) ⊣⊢ emp ∗ □ emp :=
+  sorry
+
+theorem partition_mk_intuit [BI PROP] {P : PROP} :
+    □ P ⊣⊢ emp ∗ □ □ P :=
+  sorry
+
+theorem partition_mk_spatial [BI PROP] {P : PROP} :
+    P ⊣⊢ P ∗ □ emp :=
+  sorry
+
+theorem partition_mk_merge [BI PROP] {P Ps Pi Q Qs Qi : PROP}
+  (hP : P ⊣⊢ Ps ∗ □ Pi)
+  (hQ : Q ⊣⊢ Qs ∗ □ Qi) :
+    P ∗ Q ⊣⊢ (Ps ∗ Qs) ∗ □ (Pi ∗ Qi) :=
+  sorry
+
+variable  {prop : Q(Type u)} (bi : Q(BI $prop)) in
+def Hyps.partition : ∀ {e}, Hyps bi e → PartitionHyps bi e
+  | _, .emp _ => ⟨_, .mkEmp bi, _, .mkEmp bi, q(partition_mk_emp)⟩
+  | e, h@(.hyp _ _ _ p ty _) =>
+   match matchBool p with
+   | .inl _ =>
+        have : $e =Q iprop(□ $ty) := ⟨⟩
+        ⟨_, .mkEmp bi, _, h, q(partition_mk_intuit)⟩
+   | .inr _ =>
+        ⟨_, h, _, .mkEmp bi, q(partition_mk_spatial)⟩
+  | _, .sep _ _ _ _ lhs rhs =>
+    let ⟨_, spatl, _, intuitl, pfl⟩ := lhs.partition
+    let ⟨_, spatr, _, intuitr, pfr⟩ := rhs.partition
+    ⟨_, .mkSep spatl spatr, _, .mkSep intuitl intuitr, q(partition_mk_merge $pfl $pfr)⟩
+end Iris.ProofMode
+
+
 attribute [irun_preprocess] Pure.pure Bind.bind
 
 namespace Iris.Lithium
@@ -100,7 +151,6 @@ end InEx
 def Li.pure (a : α) : Li PROP α := {
   run E := E a
   mono' E1 E2 := by
-    dsimp
     iintro HE Hwand
     ispecialize Hwand HE
     iassumption
@@ -111,7 +161,6 @@ def Li.bind (G1 : Li PROP α) (G2 : α → Li PROP β) :
   Li PROP β := {
   run E := G1.run (λ a => (G2 a).run E)
   mono' E1 E2 := by
-    dsimp
     iintro HE Hwand
     mysorry
 }
@@ -198,7 +247,6 @@ def branchR (E1 E2 : PROP) : PROP :=
 def branch (G1 G2 : Li PROP α) : Li PROP α := {
   run E := branchR (G1.run E) (G2.run E)
   mono' E1 E2 := by
-    dsimp
     iintro HE Hwand
     mysorry
 }
@@ -210,7 +258,6 @@ def lifR (P : Prop) (E1 E2 : PROP) : PROP :=
 def lif (P : Prop) (G1 G2 : Li PROP α) : Li PROP α := {
   run E := lifR P (G1.run E) (G2.run E)
   mono' E1 E2 := by
-    dsimp
     iintro HE Hwand
     mysorry
 }
@@ -222,7 +269,6 @@ def dropSpatialR (G : PROP) : PROP :=
 def dropSpatial (G : Li PROP α) : Li PROP α := {
   run E := dropSpatialR (G.run E)
   mono' E1 E2 := by
-    dsimp
     iintro HE Hwand
     mysorry
 }
@@ -343,7 +389,7 @@ def irunInhaleAtomWithRef : IRunTacticType := fun goal _config => do profileitM 
   let A' := mkApp4 (.const ``Atom.ref us) prop α A a
   let pf ← iCasesCore bi hyps Q q(false) A' A' ⟨⟩ (.one ident) fun hyps => do
     let m ← mkFreshExprSyntheticOpaqueMVar <|
-      IrisGoal.toExpr { prop, bi, hyps, goal:=Q }
+      IrisGoal.toExpr { u, prop, bi, e:=_, hyps, goal:=Q }
     goals.modify (·.push m.mvarId!)
     return m
   let pf := mkApp8 (.const ``inhale_atom_with_ref_tac us) prop α bi e A a E pf
@@ -371,7 +417,7 @@ def irunInhalePersAtomWithRef : IRunTacticType := fun goal _config => do profile
   let A'' := mkApp3 (.const ``intuitionistically [u]) prop (mkApp2 (.const ``BI.toBIBase [u]) prop bi) A'
   let pf ← iCasesCore bi hyps Q q(true) A'' A' ⟨⟩ (.one ident) fun hyps => do
     let m ← mkFreshExprSyntheticOpaqueMVar <|
-      IrisGoal.toExpr { prop, bi, hyps, goal:=Q }
+      IrisGoal.toExpr { u, prop, bi, e:=_, hyps, goal:=Q }
     goals.modify (·.push m.mvarId!)
     return m
   let pf := mkApp8 (.const ``inhale_pers_atom_with_ref_tac us) prop α bi e A a E pf
@@ -381,6 +427,39 @@ theorem inhale_prop_tac [BI PROP] φ (P : PROP) E
   (_h : φ → P ⊢ E ())
  : P ⊢ inhaleR (prop φ) E := by
    mysorry
+
+
+-- TODO: There are really strange compiler bugs here. If this
+-- definition is inline, lean crashes in files that import this one
+-- and use irunInhaleProp. Using [noinline] does not help. Also
+-- removing irunInhaleProp2, which is unused, causes the crash
+def irunInhalePropCases (m : MVarId) (n : Name) : TacticM (List MVarId) :=
+  m.withContext do
+    let some d := (← getLCtx).findFromUserName? n | throwError "cannot find freshly generated name"
+    let ty := d.type
+    -- TODO: when to we want to call cases?
+    unless ty.isEq || ty.isFalse || ty.isTrue do
+      return [m]
+    let r? ← observing? (m.cases d.fvarId)
+    return r?.elim [m] (λ m => m.toList.map (·.mvarId))
+
+def irunInhaleProp2 : IRunTacticType := fun goal _config => do profileitM Exception "irunInhaleProp" (← getOptions) do
+  let { u, prop, bi, hyp, goal:=G } := goal
+  let_expr inhaleR _ _ _ L E := G | return none
+  let_expr prop _ _ φ := L | return none
+  let n ← mkFreshUserName (.mkStr1 "h")
+  let (pf, m) ← withLocalDeclD n φ fun x => do
+    -- TODO: iintros has this, what does this do?
+    -- addLocalVarInfo ref (← getLCtx) x α
+    let m ← mkFreshExprSyntheticOpaqueMVar <|
+        IrisGoalShallow.toExpr { u, prop, bi, hyp, goal := Expr.beta E #[mkConst ``Unit.unit]}
+    let mbound ← mkLambdaFVars #[x] m
+    let pf := mkApp6 (.const ``inhale_prop_tac [u]) prop bi φ hyp E mbound
+    return (pf, m.mvarId!)
+  let mvars ← irunInhalePropCases m n
+  --let mvars := [m]
+  return .some (pf, mvars, [])
+
 
 @[irun_tac inhaleR (prop _) _]
 def irunInhaleProp : IRunTacticType := fun goal _config => do profileitM Exception "irunInhaleProp" (← getOptions) do
@@ -396,25 +475,17 @@ def irunInhaleProp : IRunTacticType := fun goal _config => do profileitM Excepti
     let mbound ← mkLambdaFVars #[x] m
     let pf := mkApp6 (.const ``inhale_prop_tac [u]) prop bi φ hyp E mbound
     return (pf, m.mvarId!)
+  let tac ← `(tactic|simp [*, irun_simp] at $(mkIdent n):ident)
   let res ← try
-      let tac ← `(tactic|simp [*, irun_simp] at $(mkIdent n):ident)
       evalTacticAtRaw tac m
     catch _e =>
       --logInfo m!"{e.toMessageData}"
       .pure [m]
   if res == [] then return .some (pf, [], [])
   let [m] := res | throwError "simp created too many subgoals"
-  let mvars ← m.withContext do
-    let some d := (← getLCtx).findFromUserName? n | throwError "cannot find freshly generated name"
-    let ty := d.type
-    -- TODO: when to we want to call cases?
-    unless ty.isEq || ty.isFalse || ty.isTrue do
-      return [m]
-    let r? ← observing? do
-      let res ← m.cases d.fvarId
-      return res.toList.map (·.mvarId)
-    return r?.elim [m] id
+  let mvars ← irunInhalePropCases m n
   return .some (pf, mvars, [])
+
 
 @[irun]
 theorem exhale_atom_with_ref [BI PROP] {α : Type _} (A : Atom PROP α) a (E : Unit → PROP) :
@@ -445,7 +516,7 @@ def irunExhaleAtomDirect : IRunTacticType := fun goal _config => do profileitM E
       if eq then return some a else return none
     | return none
   let m ← mkFreshExprSyntheticOpaqueMVar <|
-    IrisGoal.toExpr { prop, bi, hyps := hyps, goal := Expr.beta E #[a] }
+    IrisGoal.toExpr { u, prop, bi, e:=_, hyps := hyps, goal := Expr.beta E #[a] }
   let pf := mkApp11 (.const ``exhale_atom_direct_tac us) prop α bi b e P' A a E pf m
   return .some (pf, [m.mvarId!], [])
 
@@ -501,6 +572,12 @@ def irunExhaleProp : IRunTacticType := fun goal _config => do profileitM Excepti
       IrisGoalShallow.toExpr { u, prop, bi, hyp, goal := Expr.beta E #[mkConst ``Unit.unit] }
   let pf := mkApp7 (.const ``exhale_prop_tac [u]) prop bi hyp P E mP m
   return .some (pf, [m.mvarId!], [mP.mvarId!])
+
+@[irun]
+theorem exhaleR_persLi (α : Type _) [BI PROP] (G : Li PROP α) :
+  exhaleR (PROP:=PROP) (persLi G) :-
+    branch ((dropSpatial G).bind λ _ => Lithium.done) (return ()) := by
+  mysorry
 
 theorem all_tac [BI PROP] {α : Type _} (P : PROP) E
   (_h : ∀ a : α, P ⊢ E a)
@@ -568,6 +645,24 @@ theorem lif_branch [BI PROP] {cond : Prop} (E1 E2 : PROP) :
    lifR cond E1 E2 ⊣ branchR (inhaleR (prop cond) λ _ => E1) (inhaleR (prop (¬ cond)) λ _ => E2) :=
    by mysorry
 
+theorem drop_spatial_tac [BI PROP] [BIAffine PROP] P Ps Pi (E : PROP)
+  (_ : P ⊣⊢ Ps ∗ □ Pi)
+  (_ : Pi ⊢ E)
+ : P ⊢ dropSpatialR E := by
+    mysorry
+
+@[irun_tac dropSpatialR _]
+def irunDropSpatial : IRunTacticType := fun goal _config => do profileitM Exception "irunDropSpatial" (← getOptions) do
+  let { u, prop, bi, hyp, goal:=G } := goal
+  let_expr dropSpatialR _ _ E := G | return none
+  let .some ⟨e, hyps⟩ := parseHypsFromShallow? u prop bi hyp | return none
+  let .some aff ← synthInstance? (mkApp2 (.const ``BIAffine [u]) prop bi) | throwError "cannot synthesize BIAffine"
+  let ⟨es, _, ei, hypsi, pf⟩ := hyps.partition
+  let m ← mkFreshExprSyntheticOpaqueMVar <|
+    IrisGoalShallow.toExpr { u, prop, bi, hyp := hypsi.tm, goal := E }
+  let pf := mkApp9 (.const ``drop_spatial_tac [u]) prop bi aff e es ei E pf m
+  return .some (pf, [m.mvarId!], [])
+
 @[irun_tac simpR _ _ _ _]
 def irunSimp : IRunTacticType := fun goal _config => do profileitM Exception "irunSimp" (← getOptions) do
   let ig := goal
@@ -603,7 +698,7 @@ example (P : Nat → Atom PROP Unit) (Q : Atom PROP Unit) :
       exhale (atom Q)
       done).go := by
      istart
-     simp [irun_preprocess]
+     simp only [irun_preprocess]
      irun 1
      irun 1
      irun 1
@@ -625,7 +720,7 @@ example (P G : Atom PROP Unit) :
         atom G
       done).go := by
     istart
-    simp [irun_preprocess]
+    simp only [irun_preprocess]
     irun 1
     irun 1
     irun 1
@@ -645,6 +740,9 @@ reversed:
 --set_option profiler.threshold 1 in
 set_option maxRecDepth 30000 in
 set_option maxHeartbeats 2000000 in
+set_option Elab.async false in
+-- set_option trace.profiler true in
+-- set_option trace.IRun.step true in
 #time example (P : Nat → Atom PROP Unit) :
   ⊢ inhaleR (List.foldl (λ G n => (atom_with_ref (P n) () ≫ G)) (.pure tt) (List.range 100)) λ _ =>
     (List.foldl (λ G n => exhaleR (atom (P n)) λ _ => G)
@@ -887,7 +985,7 @@ example (P : Val -> Atom PROP Unit) :
       exhale (atom (P v))
       done).go := by
   istart
-  simp [irun_preprocess]
+  simp only [irun_preprocess]
   irun 1
   irun 1
   irun 1
@@ -903,8 +1001,13 @@ attribute [irun_simp] Nat.add_one_sub_one
 
 -- time: ~1700ms (when using trivial for irun_solve)
 -- time: ~2559ms (when using simp for irun_solve)
+-- time: ~3190ms (when using simp for irun_solve after updating to 4.19.0?)
 -- set_option profiler true in
 --set_option profiler.threshold 1 in
+set_option Elab.async false in
+--set_option trace.profiler true in
+--set_option trace.profiler.threshold 5 in
+--set_option trace.IRun.step true in
 #time example (P : Val -> Atom PROP Unit) :
    ⊢ (do
         inhale (atom_with_ref (P (.nat 0)) ())
@@ -913,17 +1016,13 @@ attribute [irun_simp] Nat.add_one_sub_one
         done).go := by
   istart
   unfold rec_fn
-  simp [irun_preprocess]
+  simp only [irun_preprocess]
   --set_option trace.profiler true in
   --set_option trace.profiler.threshold 1 in
   --set_option diagnostics true in
   --set_option profiler true in
   irun ∞
 
-
---set_option pp.universes true
---#check dualizing
---#check BI.mp
 
 def fn_spec (v : Val) : Atom PROP ((α : Type w) × (Val → Li PROP α) × (α → Val → Li PROP Empty)) := Atom.mk λ ⟨_, Gpre, Gpost⟩ =>
   iprop(∀ E va,
@@ -1058,7 +1157,7 @@ example :
   --simp [fn_spec_inex]
   apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
   istart
-  simp [irun_preprocess]
+  simp only [irun_preprocess]
   irun
 
 def getc_fn : Val := .recv .anon .anon (.val (.nat 1))
@@ -1082,7 +1181,7 @@ theorem echo_ok :
   unfold echo_spec echo_fn
   apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
   istart
-  simp [irun_preprocess]
+  simp only [irun_preprocess]
   irun
 
 theorem main_ok [BIAffine PROP] :
@@ -1091,7 +1190,7 @@ theorem main_ok [BIAffine PROP] :
   apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
   istart
   iintro x
-  simp [irun_preprocess]
+  simp only [irun_preprocess]
   irun
 
 def fib_fn : Val := .recv "f" "x" <|
@@ -1115,7 +1214,7 @@ theorem fib_ok [BIAffine PROP] :
   unfold fib_fn
   apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
   istart
-  simp [irun_preprocess]
+  simp only [irun_preprocess]
   irun
   · rename Nat => x
     cases x using fib.fun_cases <;> simp [fib] at * <;> omega
@@ -1232,7 +1331,7 @@ theorem empty_ok [BIAffine PROP] :
   unfold empty_fn
   apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
   istart
-  simp [irun_preprocess]
+  simp only [irun_preprocess]
   irun
 
 theorem cons_ok [BIAffine PROP] :
@@ -1242,7 +1341,7 @@ theorem cons_ok [BIAffine PROP] :
   unfold cons_fn
   apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
   istart
-  simp [irun_preprocess]
+  simp only [irun_preprocess]
   irun
 
 theorem mklist_ok [BIAffine PROP] :
@@ -1259,7 +1358,7 @@ theorem mklist_ok [BIAffine PROP] :
   apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
   istart
   iintro ⟨□ h1, □ h2⟩
-  simp [irun_preprocess]
+  simp only [irun_preprocess]
   irun
 
 
@@ -1272,7 +1371,7 @@ theorem head_ok :
   unfold head_fn
   apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
   istart
-  simp [irun_preprocess]
+  simp only [irun_preprocess]
   irun
 
 def length_fn : Val := .recv "f" "l" <|
@@ -1288,7 +1387,7 @@ theorem length_ok :
   unfold length_fn
   apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
   istart
-  simp [irun_preprocess]
+  simp only [irun_preprocess]
   irun
   rename List Val => xs
   cases xs <;> simp at *
@@ -1302,39 +1401,37 @@ def contains_fn : Val := .recv "f" "x" <|
     (.val (.nat 1)) <|
   .app (.var "f") (.binop (.snd (.load (.var "l"))) .pair (.var "cb"))
 
-@[irun]
-theorem exhaleR_persLi G :
-  exhaleR (PROP:=PROP) (persLi G) :-
-    branch (dropSpatial G) (return ()) := by
-  mysorry
-
--- TODO: This is unsound!
-@[irun]
-theorem dropSpatialR E :
-  dropSpatialR (PROP:=PROP) E ⊣ E := by
-  mysorry
-
-def contains_spec (P : Val → Bool) : PROP :=
-  fn_spec (PROP:=PROP) contains_fn # ⟨_,
+def contains_spec_pre (P : Val → Bool) : Val → Li PROP (Val × List Val) :=
     λ v => do
       let (va, cb) ← exhale (pairL v)
       let xs ← exhale (atom (is_list va))
       exhale (persLi (fn_ok cb
         (λ va => do {exhale (prop (va ∈ xs)); return va})
         (λ va vr => do {exhale (prop (vr = .nat (if P va then 1 else 0))); return ()})))
-      return (va, xs),
-    λ (va, xs) vr => do
+      return (va, xs)
+
+def contains_spec_post (P : Val → Bool) : (Val × List Val) → Val → Li PROP Empty :=
+  λ (va, xs) vr => do
       exhale (atom_with_ref (is_list va) xs)
       exhale (prop (vr = .nat (if xs.any P then 1 else 0)))
-      done⟩
+      done
 
-theorem contains_ok P :
+def contains_spec (P : Val → Bool) : PROP :=
+  fn_spec (PROP:=PROP) contains_fn # ⟨_, contains_spec_pre P, contains_spec_post P⟩
+
+
+set_option Elab.async false in
+--set_option trace.profiler true in
+--set_option trace.IRun.step true in
+--set_option trace.profiler.threshold 5 in
+-- time: ~578ms
+#time theorem contains_ok [BIAffine PROP] P :
   ⊢ contains_spec (PROP:=PROP) P := by
-  unfold contains_spec contains_fn
+  unfold contains_spec contains_spec_pre contains_spec_post contains_fn
   apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
   istart
-  simp [irun_preprocess]
-  irun ∞
+  simp only [irun_preprocess]
+  irun
   rename List Val => xs
   cases xs <;> simp at *
 
@@ -1343,16 +1440,31 @@ def contains_one_fn : Val := .recv .anon "x" <|
 
 -- TODO: profile this, this is slower than the Rocq version
 -- TODO: The profile says "tactic execution of Lean.Parser.Tactic.refine took 654ms". Where does this come from?
-set_option profiler true in
-#time theorem contains_one_ok :
-  □ contains_spec (λ v => v == .nat 1) ⊢ fn_spec (PROP:=PROP) contains_one_fn # ⟨_,
-    λ va => do {let xs ← exhale (atom (is_list va)); exhale (prop (∀ x ∈ xs, ∃ n, x = .nat n)); return (va, xs)},
-    λ (va, xs) vr => do {exhale (atom_with_ref (is_list va) xs); exhale (prop (vr = .nat (if Val.nat 1 ∈ xs then 1 else 0))); done}⟩ := by
-  unfold contains_spec contains_one_fn
-  apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
+set_option Elab.async false in
+--set_option trace.profiler true in
+--set_option trace.profiler.threshold 10 in
+--set_option trace.IRun.step true in
+--set_option profiler true in
+-- time: 261ms
+#time theorem contains_one_ok [BIAffine PROP] :
+  ⊢ (do
+    inhale (pers (atom_with_ref (fn_spec contains_fn)
+      ⟨_, contains_spec_pre (λ v => v == Val.nat 1), contains_spec_post (λ v => v == Val.nat 1)⟩))
+    fn_ok (PROP:=PROP) contains_one_fn
+      (λ va => do
+        let xs ← exhale (atom (is_list va))
+        exhale (prop (∀ x ∈ xs, ∃ n, x = Val.nat n))
+        return (va, xs))
+      (λ (va, xs) vr => do
+        exhale (atom_with_ref (is_list va) xs)
+        exhale (prop (vr = Val.nat (if Val.nat 1 ∈ xs then 1 else 0)))
+        done)).go := by
+  unfold contains_spec_pre contains_spec_post contains_one_fn
   istart
-  simp [irun_preprocess]
-  iintro □h
+
+  -- Time goes from ~300ms to ~2000ms if one removes the only. Why?
+  simp only [irun_preprocess]
+  -- iintro □h
   irun
 --  all_goals mysorry
   -- TODO: automate this somehow?
@@ -1360,8 +1472,5 @@ set_option profiler true in
   have ⟨n, Hn⟩ : ∃ n, v = .nat n := by simp [*]
   simp only [Hn]
   irun
-
-
-
 
 end Iris.Examples
