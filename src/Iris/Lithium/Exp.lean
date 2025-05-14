@@ -6,7 +6,7 @@ Authors: Michael Sammler
 import Iris.BI
 import Iris.ProofMode
 
-namespace Iris.Examples.Lang
+namespace Iris.ExampleLang
 
 inductive Binder where
 | anon : Binder
@@ -103,18 +103,18 @@ def Binder.unreify (b : Binder) : Expr :=
 
 -- should this be ToExpr?
 def Exp.unreify : Exp → Expr
-  | .val v => mkApp (mkConst ``Lang.Exp.val) v
-  | .var v => mkApp (mkConst ``Lang.Exp.var) (mkStrLit v)
-  | .binop e1 o e2 => mkApp3 (mkConst ``Lang.Exp.binop) (unreify e1) o (unreify e2)
-  | .fst e1 => mkApp (mkConst ``Lang.Exp.fst) (unreify e1)
-  | .snd e1 => mkApp (mkConst ``Lang.Exp.snd) (unreify e1)
-  | .rece f x e => mkApp3 (mkConst ``Lang.Exp.rece) (Binder.unreify f) (Binder.unreify x) (unreify e)
-  | .lete x e1 e2 => mkApp3 (mkConst ``Lang.Exp.lete) (Binder.unreify x) (unreify e1) (unreify e2)
-  | .app e1 e2 => mkApp2 (mkConst ``Lang.Exp.app) (unreify e1) (unreify e2)
-  | .ife e1 e2 e3 => mkApp3 (mkConst ``Lang.Exp.ife) (unreify e1) (unreify e2) (unreify e3)
-  | .alloc => mkConst ``Lang.Exp.alloc
-  | .load e1 => mkApp (mkConst ``Lang.Exp.load) (unreify e1)
-  | .store e1 e2 => mkApp2 (mkConst ``Lang.Exp.store) (unreify e1) (unreify e2)
+  | .val v => mkApp (mkConst ``ExampleLang.Exp.val) v
+  | .var v => mkApp (mkConst ``ExampleLang.Exp.var) (mkStrLit v)
+  | .binop e1 o e2 => mkApp3 (mkConst ``ExampleLang.Exp.binop) (unreify e1) o (unreify e2)
+  | .fst e1 => mkApp (mkConst ``ExampleLang.Exp.fst) (unreify e1)
+  | .snd e1 => mkApp (mkConst ``ExampleLang.Exp.snd) (unreify e1)
+  | .rece f x e => mkApp3 (mkConst ``ExampleLang.Exp.rece) (Binder.unreify f) (Binder.unreify x) (unreify e)
+  | .lete x e1 e2 => mkApp3 (mkConst ``ExampleLang.Exp.lete) (Binder.unreify x) (unreify e1) (unreify e2)
+  | .app e1 e2 => mkApp2 (mkConst ``ExampleLang.Exp.app) (unreify e1) (unreify e2)
+  | .ife e1 e2 e3 => mkApp3 (mkConst ``ExampleLang.Exp.ife) (unreify e1) (unreify e2) (unreify e3)
+  | .alloc => mkConst ``ExampleLang.Exp.alloc
+  | .load e1 => mkApp (mkConst ``ExampleLang.Exp.load) (unreify e1)
+  | .store e1 e2 => mkApp2 (mkConst ``ExampleLang.Exp.store) (unreify e1) (unreify e2)
   | .unk e => e
 
 def Binder.reify (e : Expr) : Option Binder :=
@@ -128,27 +128,27 @@ def Binder.reify (e : Expr) : Option Binder :=
 
 partial def reify (e : Expr) : Exp :=
   match_expr e with
-  | Lang.Exp.val v => .val v
-  | Lang.Exp.var v =>
+  | ExampleLang.Exp.val v => .val v
+  | ExampleLang.Exp.var v =>
     match v with
     | .lit (.strVal v) => .var v
     | _ => .unk e
-  | Lang.Exp.binop e1 o e2 => .binop (reify e1) o (reify e2)
-  | Lang.Exp.fst e1 => .fst (reify e1)
-  | Lang.Exp.snd e1 => .snd (reify e1)
-  | Lang.Exp.rece f x e' =>
+  | ExampleLang.Exp.binop e1 o e2 => .binop (reify e1) o (reify e2)
+  | ExampleLang.Exp.fst e1 => .fst (reify e1)
+  | ExampleLang.Exp.snd e1 => .snd (reify e1)
+  | ExampleLang.Exp.rece f x e' =>
     match Binder.reify f, Binder.reify x with
     | some f, some x => .rece f x (reify e')
     | _, _ => .unk e
-  | Lang.Exp.lete x e1 e2 =>
+  | ExampleLang.Exp.lete x e1 e2 =>
     match Binder.reify x with
     | some x => .lete x (reify e1) (reify e2)
     | _ => .unk e
-  | Lang.Exp.app e1 e2 => .app (reify e1) (reify e2)
-  | Lang.Exp.ife e1 e2 e3 => .ife (reify e1) (reify e2) (reify e3)
-  | Lang.Exp.alloc => .alloc
-  | Lang.Exp.load e1 => .load (reify e1)
-  | Lang.Exp.store e1 e2 => .store (reify e1) (reify e2)
+  | ExampleLang.Exp.app e1 e2 => .app (reify e1) (reify e2)
+  | ExampleLang.Exp.ife e1 e2 e3 => .ife (reify e1) (reify e2) (reify e3)
+  | ExampleLang.Exp.alloc => .alloc
+  | ExampleLang.Exp.load e1 => .load (reify e1)
+  | ExampleLang.Exp.store e1 e2 => .store (reify e1) (reify e2)
   | _ => .unk e
 
 def subst (x : String) (v : Expr) (e : Exp) : Exp :=
@@ -165,7 +165,7 @@ def subst (x : String) (v : Expr) (e : Exp) : Exp :=
   | .alloc => .alloc
   | .load e1 => .load (subst x v e1)
   | .store e1 e2 => .store (subst x v e1) (subst x v e2)
-  | .unk e => .unk (mkApp3 (mkConst ``Lang.subst) (mkStrLit x) v e)
+  | .unk e => .unk (mkApp3 (mkConst ``ExampleLang.subst) (mkStrLit x) v e)
 
 def subst' (x : Binder) (v : Expr) (e : Exp) : Exp :=
   match x with

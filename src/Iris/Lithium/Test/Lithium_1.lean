@@ -5,9 +5,9 @@ Authors: Michael Sammler
 -/
 import Iris.BI
 import Iris.ProofMode
-import Iris.Examples.IRunAttr
-import Iris.Examples.IRun
-import Iris.Examples.Exp
+import Iris.Lithium.IRunAttr
+import Iris.Lithium.IRun
+import Iris.Lithium.Exp
 
 /-
 next steps:

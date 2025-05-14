@@ -5,13 +5,13 @@ Authors: Michael Sammler
 -/
 import Iris.BI
 import Iris.ProofMode
-import Iris.Examples.IRunAttr
-import Iris.Examples.IRun
-import Iris.Examples.Exp
+import Iris.Lithium.IRunAttr
+import Iris.Lithium.IRun
+import Iris.Lithium.Exp
 
 
-namespace Iris.ProofMode
-open Lean Elab Tactic Meta Qq BI Std
+namespace Iris.Lithium
+open Lean Elab Tactic Meta Qq BI Std ProofMode
 
 @[irun:high]
 theorem li_assoc_star.{u} {PROP : Type u} [BI PROP] {P1 P2 P3 : PROP}
@@ -176,10 +176,10 @@ set_option maxRecDepth 30000 in
 
 end test
 
-end Iris.ProofMode
+end Iris.Lithium
 
 namespace Iris.Examples
-open BI Lang
+open BI ExampleLang
 
 variable {u} [BI.{u} PROP]
 
@@ -219,7 +219,7 @@ theorem wp_plus e1 e2 (P : Val -> PROP) :
    wp e2 λ v2 =>
    wpnat v1 λ n1 =>
    wpnat v2 λ n2 =>
-   ProofMode.wpsimp `irun_simp (n1 + n2) λ n =>
+   Lithium.wpsimp `irun_simp (n1 + n2) λ n =>
    P (.nat n)) ⊢ wp (Exp.binop e1 .plus e2) P := by sorry
 
 @[irun]
@@ -228,7 +228,7 @@ theorem wp_minus e1 e2 (P : Val -> PROP) :
    wp e2 λ v2 =>
    wpnat v1 λ n1 =>
    wpnat v2 λ n2 =>
-   ProofMode.wpsimp `irun_simp (n1 - n2) λ n =>
+   Lithium.wpsimp `irun_simp (n1 - n2) λ n =>
    P (.nat n)) ⊢ wp (Exp.binop e1 .minus e2) P := by sorry
 
 @[irun]
@@ -237,7 +237,7 @@ theorem wp_eq e1 e2 (P : Val -> PROP) :
    wp e2 λ v2 =>
    wpnat v1 λ n1 =>
    wpnat v2 λ n2 =>
-   ProofMode.wpsimp `irun_simp (if n1 == n2 then 1 else 0) λ n =>
+   Lithium.wpsimp `irun_simp (if n1 == n2 then 1 else 0) λ n =>
    P (.nat n)) ⊢ wp (Exp.binop e1 .eq e2) P := by sorry
 
 @[irun]
@@ -257,12 +257,12 @@ theorem wp_app e1 e2 (P : Val -> PROP) :
 theorem wp_if e1 e2 e3 (P : Val -> PROP) :
   (wp e1 λ v1 =>
    wpnat v1 λ n1 =>
-   ProofMode.lif (n1 ≠ 0) (wp e2 P) (wp e3 P)) ⊢
+   Lithium.lif (n1 ≠ 0) (wp e2 P) (wp e3 P)) ⊢
   wp (.ife e1 e2 e3) P := by sorry
 
 
 section
-open Lean Elab Tactic Meta Qq BI Std ProofMode
+open Lean Elab Tactic Meta Qq BI Std ProofMode Lithium
 
 @[irun_tac wpsubst _ _ _ _]
 def irunSubst : IRunTacticType := fun goal _config => do profileitM Exception "irunSubst" (← getOptions) do

@@ -5,7 +5,7 @@ Authors: Michael Sammler
 -/
 import Iris.BI
 import Iris.ProofMode
-import Iris.Examples.IStepAttr
+import Iris.Lithium.Test.IStepAttr
 
 /-
 next steps:

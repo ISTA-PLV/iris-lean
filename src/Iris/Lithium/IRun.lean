@@ -5,26 +5,10 @@ Authors: Michael Sammler
 -/
 import Iris.BI
 import Iris.ProofMode
-import Iris.Examples.IRunAttr
+import Iris.Lithium.IRunAttr
 
-/-
-next steps:
-- rename tactics and everything to a consistent name
-- add support for ⌜P⌝ -∗ G
-- add support for ⌜P⌝ ∗ G
-- add support for lif where one cannot prove either side
-- add syntax for Lithium goals
-- look into performance
-- figure out how to avoid dsimp in wpsubst
-- define wp
-- add more lithium connectives
-- prove sorrys
-- do more examples
-- define a notation for the language
--/
-
-namespace Iris.ProofMode
-open Lean Elab Tactic Meta Qq BI Std
+namespace Iris.Lithium
+open Lean Elab Tactic Meta Qq BI ProofMode Std
 
 syntax "irunsolve" : tactic
 --macro_rules
@@ -87,7 +71,6 @@ def irunSearch (config : IRunConfig) (goal : IrisGoalShallow) (tree : DiscrTree 
   return none
 
 
---def profileitM (_ : Type) (_ : String) (_ : Options) (act : TacticM α) : TacticM α := act
 partial def irunCore (config : IRunConfig) (nsteps : Option Nat) : TacticM Unit := do profileitM Exception "irun" (← getOptions) do
   -- TODO: keep track of [IrisGoal]s instead of just MVars such that tactics can avoid reparsing
   let mut (goals, shelved) ← (← getGoals).partitionM λ m => do
@@ -122,26 +105,6 @@ partial def irunCore (config : IRunConfig) (nsteps : Option Nat) : TacticM Unit 
       if progress_match then
         goal := ← goal.replaceTargetDefEq g'
       if config.debug then logInfo m!"progress: {progress_match}, G: {ig.goal}, G': {G'}"
-/-
-      repeat do
-        let g ← instantiateMVars <| ← goal.getType
-        let some #[prop, bi, P, G] := g.appM? ``Entails' | throwError "not in proof mode"
-        if G.isHeadBetaTarget then
-          let G' := G.headBeta
-          let g' := mkApp4 (.const ``Entails' [g.getAppFn.constLevels![0]!])
-            prop bi P G'
-          goal.setType g'
-          progress_match := true
-          continue
-        if (← isMatcherApp G) then
-          let some G' ← reduceRecMatcher? G | throwError s!"Cannot reduce matcher at step {n}"
-          let g' := mkApp4 (.const ``Entails' [g.getAppFn.constLevels![0]!])
-            prop bi P G'
-          goal := ← goal.replaceTargetDefEq g'
-          progress_match := true
-          continue
-        break
--/
 
     -- call dsimp on the goal, very expensive
     -- TODO: make this an option?
