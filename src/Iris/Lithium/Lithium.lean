@@ -156,6 +156,17 @@ def done : Li PROP α := {
     iassumption
 }
 
+def failR {α : Type} (_ : α) : PROP := iprop(False)
+
+@[irun_preprocess]
+def fail {β : Type} (a : β) : Li PROP α := {
+  run E := failR a
+  mono' E1 E2 := by
+    dsimp [failR]
+    iintro HE Hwand
+    iassumption
+}
+
 def branchR (E1 E2 : PROP) : PROP :=
   iprop(E1 ∧ E2)
 
@@ -398,7 +409,8 @@ end inhale
 
 section exhale
 
-@[irun]
+-- not necessary since there is the direct matching running first
+-- @[irun]
 theorem cancel_match [BI PROP] {α : Type _} (A : Atom PROP α) a E :
   cancelR (A # a) A E ⊣ E a := by mysorry
 

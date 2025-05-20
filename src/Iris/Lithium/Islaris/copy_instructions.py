@@ -53,9 +53,8 @@ def main():
                     f.write(f"namespace Islaris.{dir_name.replace(os.sep, '.')}\n")
                     f.write("\n")
                     f.write("set_option maxRecDepth 30000 in\n")
-                    f.write(f"def {original_file_name} : IslaTrace := isla(\n")
+                    f.write(f"abbrev {original_file_name} : IslaTrace := isla%\n")
                     f.write(content)
-                    f.write(")\n")
 
                 print(f"Processed: {target_file} (from {rel_path})")
 

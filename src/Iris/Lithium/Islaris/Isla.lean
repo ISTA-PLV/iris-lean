@@ -6,6 +6,7 @@ Authors: Michael Sammler
 import Iris.BI
 import Iris.ProofMode
 import Iris.Lithium.Base
+import Iris.Lithium.Islaris.Base
 
 namespace Islaris
 open Lean Elab Meta
@@ -209,6 +210,77 @@ inductive IslaTrace where
 | cases (ts : List IslaTrace)
 deriving Inhabited, Repr, ToExpr
 
+
+section substitution
+
+def substBaseVal (v : BaseVal) (x : VarName) : BaseVal → BaseVal
+| .symbolic v' => if v' = x then v else .symbolic v'
+| v => v
+
+def substExp (v : BaseVal) (x : VarName) : Exp → Exp
+| .val v' => .val (substBaseVal v x v')
+| .unop op e => .unop op (substExp v x e)
+| .binop op e1 e2 => .binop op (substExp v x e1) (substExp v x e2)
+| .manyop op es => .manyop op (es.map (substExp v x))
+| .ite e1 e2 e3 => .ite (substExp v x e1) (substExp v x e2) (substExp v x e3)
+
+def substSmt (v : BaseVal) (x : VarName) : Smt → Smt
+| .declareConst va ty => .declareConst va ty
+| .defineConst va e => .defineConst va (substExp v x e)
+| .assert e => .assert (substExp v x e)
+| .defineEnum n i ns => .defineEnum n i ns
+
+mutual
+def substValu (v : BaseVal) (x : VarName) : Valu → Valu
+| .base v' => .base (substBaseVal v x v')
+| .i n m => .i n m
+| .string s => .string s
+| .unit => .unit
+| .vector vs => .vector (vs.map (substValu v x))
+| .list vs => .list (vs.map (substValu v x))
+| .struct vs => .struct (vs.map (substStructElem v x))
+| .constructor n v' => .constructor n (substValu v x v')
+| .poison => .poison
+def substStructElem (v : BaseVal) (x : VarName) : (String × Valu) → (String × Valu)
+| (s1, s2) => (s1, substValu v x s2)
+end
+
+def substEvent (v : BaseVal) (x : VarName) : Event → Event
+| .smt s => .smt (substSmt v x s)
+| .branch i s => .branch i s
+| .readReg n ac v' => .readReg n ac (substValu v x v')
+| .writeReg n ac v' => .writeReg n ac (substValu v x v')
+| .readMem v' rkind addr nb tag => .readMem (substValu v x v') (substValu v x rkind) (substValu v x addr) nb (tag.map (substValu v x))
+| .writeMem v' wkind addr data nb tag => .writeMem (substValu v x v') (substValu v x wkind) (substValu v x addr) (substValu v x data) nb (tag.map (substValu v x))
+| .branchAddress addr => .branchAddress (substValu v x addr)
+| .barrier bkind => .barrier (substValu v x bkind)
+| .cacheOp ckind addr => .cacheOp (substValu v x ckind) (substValu v x addr)
+| .markReg n s => .markReg n s
+| .cycle => .cycle
+| .instr opcode => .instr (substValu v x opcode)
+| .sleeping v' => .sleeping v'
+| .wakeRequest => .wakeRequest
+| .sleepRequest => .sleepRequest
+| .call n => .call n
+| .return n => .return n
+| .assumeReg n ac v' => .assumeReg n ac  (substValu v x v')
+| .assume e => .assume e
+| .funAssume n v' a => .funAssume n (substValu v x v') a
+| .useFunAssume n v' a => .useFunAssume n (substValu v x v') a
+| .abstractCall n v' a => .abstractCall n (substValu v x v') a
+| .abstractPrimop n v' a => .abstractPrimop n (substValu v x v') a
+
+
+def substTrace (v : BaseVal) (x : VarName) : IslaTrace → IslaTrace
+  | .nil => .nil
+  | .cons e t' => .cons (substEvent v x e) (substTrace v x t')
+  | .cases ts => .cases (ts.map (substTrace v x))
+
+end substitution
+
+
+
+
 declare_syntax_cat isla_name
 syntax "isla_name(" isla_name ")" : term
 syntax "|" ident "|" : isla_name
@@ -234,8 +306,8 @@ open Parser
 declare_syntax_cat isla_bv
 syntax "isla_bv(" isla_bv ")" : term
 -- this should parse "(_ bv2 4)"
-syntax "(_" ident num ")" : isla_bv
-syntax "(_" &"bv" "-" num num ")" : isla_bv
+syntax "(" "_" ident num ")" : isla_bv
+syntax "(" "_" &"bv" "-" num num ")" : isla_bv
 syntax "#" ident  : isla_bv
 
 macro_rules
@@ -271,7 +343,7 @@ declare_syntax_cat isla_ty
 syntax "isla_ty(" isla_ty ")" : term
 
 syntax ident : isla_ty
-syntax "(_" &"BitVec" num ")" : isla_ty
+syntax "(" "_" &"BitVec" num ")" : isla_ty
 syntax isla_name : isla_ty
 syntax "(" &"Array" isla_ty isla_ty ")" : isla_ty
 
@@ -301,7 +373,7 @@ macro_rules
 declare_syntax_cat isla_accessor
 syntax "isla_accessor(" isla_accessor ")" : term
 
-syntax "(_" ppSpace &"field" ppSpace isla_name ")" : isla_accessor
+syntax "(" "_" ppSpace &"field" ppSpace isla_name ")" : isla_accessor
 
 macro_rules
 | `(isla_accessor((_ field $n))) => `(Accessor.field isla_name($n))
@@ -337,8 +409,8 @@ syntax "isla_exp(" isla_exp ")" : term
 syntax isla_base_val : isla_exp
 syntax "(" ident isla_exp* ")" : isla_exp
 syntax "(" "=" isla_exp* ")" : isla_exp
-syntax "(" "(_" ident num ")" isla_exp ")" : isla_exp
-syntax "(" "(_" ident num num ")" isla_exp ")" : isla_exp
+syntax "(" "(" "_" ident num ")" isla_exp ")" : isla_exp
+syntax "(" "(" "_" ident num num ")" isla_exp ")" : isla_exp
 
 macro_rules
 | `(isla_exp($i:isla_base_val)) => `(Exp.val isla_base_val($i))
@@ -395,8 +467,8 @@ syntax "isla_aexp(" isla_aexp ")" : term
 syntax isla_assume_val : isla_aexp
 syntax "(" "=" isla_aexp* ")" : isla_aexp
 syntax "(" ident isla_aexp* ")" : isla_aexp
-syntax "(" "(_" ident num ")" isla_aexp ")" : isla_aexp
-syntax "(" "(_" ident num num ")" isla_aexp ")" : isla_aexp
+syntax "(" "(" "_" ident num ")" isla_aexp ")" : isla_aexp
+syntax "(" "(" "_" ident num num ")" isla_aexp ")" : isla_aexp
 
 macro_rules
 | `(isla_aexp($i:isla_assume_val)) => `(AExp.val isla_assume_val($i))
@@ -469,14 +541,14 @@ syntax "isla_valu(" isla_valu ")" : term
 
 syntax isla_base_val : isla_valu
 syntax str : isla_valu
-syntax "(_" &"unit" ")" : isla_valu
-syntax "(_" &"vec" isla_valu* ")" : isla_valu
-syntax "(_" &"vec" &"nil" ")" : isla_valu
-syntax "(_" &"list" isla_valu* ")" : isla_valu
-syntax "(_" &"list" &"nil" ")" : isla_valu
-syntax "(_" &"struct" ("(" isla_name isla_valu ")")* ")" : isla_valu
+syntax "(" "_" &"unit" ")" : isla_valu
+syntax "(" "_" &"vec" isla_valu* ")" : isla_valu
+syntax "(" "_" &"vec" &"nil" ")" : isla_valu
+syntax "(" "_" &"list" isla_valu* ")" : isla_valu
+syntax "(" "_" &"list" &"nil" ")" : isla_valu
+syntax "(" "_" &"struct" ("(" isla_name isla_valu ")")* ")" : isla_valu
 syntax "(" isla_name isla_valu ")" : isla_valu
-syntax "(_" &"poison" ")" : isla_valu
+syntax "(" "_" &"poison" ")" : isla_valu
 
 macro_rules
 | `(isla_valu($i:isla_base_val)) => `(Valu.base isla_base_val($i))
@@ -573,3 +645,64 @@ macro_rules
 | `(isla((trace ))) => `(IslaTrace.nil)
 | `(isla((trace $i:isla_event $es*))) => `(IslaTrace.cons isla_event($i) isla((trace $es*)))
 | `(isla((trace (cases $_ $[$ts]*) )) ) => `(IslaTrace.cases [ $[isla($ts)],* ])
+
+
+section preprocess
+
+open Lean Elab Term Meta Iris.Lithium
+
+@[isla_preprocess]
+def ignored_regs : List String := [
+-- aarch64
+  "SEE",
+  "BTypeNext",
+  "__currentInstrLength",
+  "__PC_changed",
+  "__unconditional",
+  "__v81_implemented",
+  "__v82_implemented",
+  "__v83_implemented",
+  "__v84_implemented",
+  "__v85_implemented",
+  "__trickbox_enabled",
+  "__CNTControlBase",
+  "__defaultRAM",
+  "__monomorphize_reads",
+  "__monomorphize_writes",
+  "__isla_vector_gpr",
+  "__highest_el_aarch32",
+-- riscv64
+  "nextPC",
+]
+
+-- created via simp?
+attribute [isla_preprocess] List.mem_cons List.not_mem_nil or_self or_false or_true decide_true decide_false Bool.false_eq
+
+-- corresponds to event_filter in frontend/decomp.ml
+-- TODO: implement this as a function that operations on Expr
+@[isla_preprocess]
+def islaEventFilter : Event → Bool
+| .assumeReg n _ _ => match decide (n ∈ ignored_regs) with | true => false | false => true
+| .readReg n _ _ => match decide (n ∈ ignored_regs) with | true => false | false => true
+| .writeReg n _ _ => match decide (n ∈ ignored_regs) with | true => false | false => true
+| .cycle => false
+| .markReg _ _ => false
+| .smt (.defineEnum _ _ _) => false
+| _ => true
+
+@[isla_preprocess]
+def islaPreprocess : IslaTrace → IslaTrace
+| .nil => .nil
+| .cases ts => .cases (ts.map islaPreprocess)
+| .cons e t => match islaEventFilter e with
+               | true => .cons e (islaPreprocess t)
+               | false => (islaPreprocess t)
+
+syntax (name:=isla_elab) "isla%" ("?")? isla : term
+
+@[term_elab isla_elab]
+def islaElab : TermElab := λ stx ty => do
+  let e ← elabTerm (←`(isla($(⟨stx[2]⟩)))) ty
+  let ⟨e', _⟩ ← simpWithExt `isla_preprocess (← mkAppM ``islaPreprocess #[e]) (simprocs := #[← Simp.getSimprocs])
+  if !stx[1][0].isMissing then logInfo m!"{e'.expr}"
+  return e'.expr

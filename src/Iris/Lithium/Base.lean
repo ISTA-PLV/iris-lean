@@ -7,6 +7,36 @@ import Lean
 import Iris.BI
 import Iris.ProofMode
 
+namespace Lean.Expr
+def modifyApp1 (e : Expr) (arg1 : Expr) : Expr :=
+  match e with
+  | .app f _ => .app f arg1
+  | e         => e
+
+def modifyApp2 (e : Expr) (arg1 arg2 : Expr) : Expr :=
+  match e with
+  | .app (.app f _) _ =>  .app (.app f arg1) arg2
+  | e         => e
+
+@[inline] def mapMOptionLit [Monad m] (e : Expr) (f : Expr → m Expr) : m (Option Expr) :=
+  match_expr e with
+  | Option.some _ x => do return some (e.modifyApp1 (← f x))
+  | Option.none _ => return some e
+  | _ => return none
+
+-- TODO: make this tail recursive
+@[inline]
+partial def mapMListLit [Monad m] (f : Expr → m Expr) (e : Expr) : m (Option Expr) :=
+  match_expr e with
+  | List.nil _ => return some e
+  | List.cons _ x ls => do
+    let some ls ← mapMListLit f ls | return none
+    return some (e.modifyApp2 (← f x) ls)
+  | _ => return none
+
+end Lean.Expr
+
+
 namespace Iris.ProofMode
 open Lean Elab.Tactic Meta Qq BI
 
@@ -81,11 +111,11 @@ def dsimpWithExt (ext_name : Name) (e : Expr) : MetaM (Expr × Simp.Stats) := do
   -- TODO: use simpprocs as well?
   Meta.dsimp e simpctx {}
 
-def simpWithExt (ext_name : Name) (e : Expr) (config := ({} : Simp.Config)) : MetaM (Simp.Result × Simp.Stats) := do
+def simpWithExt (ext_name : Name) (e : Expr) (config := ({} : Simp.Config)) (simprocs : Array Simprocs := #[]) : MetaM (Simp.Result × Simp.Stats) := do
   let ext ← Lean.Meta.getSimpExtension? ext_name
   let theorems ← ext.get!.getTheorems
   let simpctx := ← Simp.mkContext (config:=config) (simpTheorems := #[theorems])
-  Meta.simp e simpctx {}
+  Meta.simp e simpctx (simprocs:=simprocs)
 
 end simp
 

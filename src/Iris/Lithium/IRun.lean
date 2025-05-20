@@ -40,7 +40,9 @@ def irunSearch (config : IRunConfig) (goal : IrisGoalShallow) (tree : DiscrTree 
         let pf := mkConst decl (← mkFreshLevelMVarsFor info)
         let (args, _, targetTy) ← forallMetaTelescopeReducing (← inferType pf)
         let .some (Gnew, Gdecl) := unpackEntails targetTy | throwError "theorem is not entails, this should not happen"
+        -- if config.debug then logInfo m!"comparing {G} and {Gdecl}"
         let .true ← withReducible <| isDefEq G Gdecl | return none
+        -- if config.debug then logInfo m!"match"
 
         let mut do_cont := false
         for mvar in args do
