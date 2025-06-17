@@ -24,7 +24,7 @@ theorem irun_apply.{u} {PROP : Type u} [BI PROP] {P Q Q' : PROP}
 def irunSearch (config : IRunConfig) (goal : IrisGoalShallow) (tree : DiscrTree IRunEntry) : TacticM (Option (Expr × List MVarId × List MVarId)) := do
   let { u, prop, bi, hyp, goal:=G } := goal
   if config.debug then logInfo m!"Goal: {G}"
-  withTraceNode `IRun.step (λ _ => return m!"goal: {G.getAppFn'}") do
+  withTraceNode `IRun.step (λ _ => return m!"goal: {G.getBoundedAppFn 1}") do
   -- logInfo m!"IN LOOP: {G}"
   let G ← instantiateExprMVars G
   if G.isMVar then throwError "irun failed: goal has free metavars"

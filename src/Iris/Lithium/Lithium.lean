@@ -8,6 +8,19 @@ import Iris.ProofMode
 import Iris.Lithium.IRunAttr
 import Iris.Lithium.IRun
 
+/-
+TODO:
+- add a lithium environment that replaces theorem and allows one to do timing and disable kernel typechecking / instantiation MVars
+something like the following:
+lithium +time -kernel test i : do
+  exhale (prop (i = 1))
+  done
+by
+  irun
+
+- make cancelation in rounds, such that one can first do all simple matches and then all matches that require solvers. Idea: Add a Nat parameter for cancelR and in the first pass collect all Nats and in the following passes take the instances from the first passes
+-/
+
 namespace Iris.Lithium
 open Lean Elab.Tactic Meta Qq BI
 
@@ -691,7 +704,7 @@ set_option Elab.async false in
 -- set_option trace.profiler true in
 -- set_option trace.IRun.step true in
 #time example (P : Nat → Atom PROP Unit) :
-  ⊢ inhaleR (List.foldl (λ G n => ((atom_with_ref (P n) ()).bind λ _ => G)) (.pure tt) (List.range 100)) λ _ =>
+  ⊢ inhaleR (List.foldl (λ G n => ((atom_with_ref (P n) ()).bind λ _ => G)) (.pure ()) (List.range 100)) λ _ =>
     (List.foldl (λ G n => exhaleR (atom (P n)) λ _ => G)
       (doneR) (
     -- List.reverse makes cancellation faster

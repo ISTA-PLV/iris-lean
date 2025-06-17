@@ -675,34 +675,46 @@ def ignored_regs : List String := [
   "nextPC",
 ]
 
--- created via simp?
-attribute [isla_preprocess] List.mem_cons List.not_mem_nil or_self or_false or_true decide_true decide_false Bool.false_eq
+partial def islaPreprocessEventFilter (e : Expr) : MetaM Bool :=
+  match_expr e with
+  | Event.assumeReg n _ _ => do
+    let .lit (.strVal n) := n | return true
+    return n ∉ ignored_regs
+  | Event.readReg n _ _ => do
+    let .lit (.strVal n) := n | return true
+    return n ∉ ignored_regs
+  | Event.writeReg n _ _ => do
+    let .lit (.strVal n) := n | return true
+    return n ∉ ignored_regs
+  | Event.cycle => return false
+  | Event.markReg _ _ => return false
+  | Event.smt e' =>
+    match_expr e' with
+    | Smt.defineEnum _ _ _ => return false
+    | _ => return true
+  | _ => return true
 
--- corresponds to event_filter in frontend/decomp.ml
--- TODO: implement this as a function that operations on Expr
-@[isla_preprocess]
-def islaEventFilter : Event → Bool
-| .assumeReg n _ _ => match decide (n ∈ ignored_regs) with | true => false | false => true
-| .readReg n _ _ => match decide (n ∈ ignored_regs) with | true => false | false => true
-| .writeReg n _ _ => match decide (n ∈ ignored_regs) with | true => false | false => true
-| .cycle => false
-| .markReg _ _ => false
-| .smt (.defineEnum _ _ _) => false
-| _ => true
+partial def islaPreprocess (e : Expr) : MetaM Expr :=
+  match_expr e with
+  | IslaTrace.nil => return e
+  | IslaTrace.cons ev t' => do
+    let t' ← islaPreprocess t'
+    if ← islaPreprocessEventFilter ev then
+      return e.modifyApp1 t'
+    else
+      return t'
+  | IslaTrace.cases ts => do
+    let some ts ← ts.mapMListLit islaPreprocess
+      | throwError "islaPreprocess: cannot do prepocess in {e}"
+    return mkApp (mkConst ``IslaTrace.cases) ts
+  | _ => throwError "islaPreprocess: cannot do prepocess in {e}"
 
-@[isla_preprocess]
-def islaPreprocess : IslaTrace → IslaTrace
-| .nil => .nil
-| .cases ts => .cases (ts.map islaPreprocess)
-| .cons e t => match islaEventFilter e with
-               | true => .cons e (islaPreprocess t)
-               | false => (islaPreprocess t)
 
 syntax (name:=isla_elab) "isla%" ("?")? isla : term
 
 @[term_elab isla_elab]
 def islaElab : TermElab := λ stx ty => do
   let e ← elabTerm (←`(isla($(⟨stx[2]⟩)))) ty
-  let ⟨e', _⟩ ← simpWithExt `isla_preprocess (← mkAppM ``islaPreprocess #[e]) (simprocs := #[← Simp.getSimprocs])
-  if !stx[1][0].isMissing then logInfo m!"{e'.expr}"
-  return e'.expr
+  let e' ← islaPreprocess e
+  if !stx[1][0].isMissing then logInfo m!"{e'}"
+  return e'

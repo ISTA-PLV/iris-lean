@@ -27,7 +27,8 @@ abbrev testStateSpec : Spec :=
   Spec.nil
 
 
--- set_option profiler true in
+set_option profiler true in
+-- set_option trace.profiler true in
 set_option Elab.async false in
 #time example :
   ⊢ (do

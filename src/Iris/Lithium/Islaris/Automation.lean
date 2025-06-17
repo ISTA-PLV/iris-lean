@@ -43,6 +43,42 @@ def irunBitvecCast : IRunTacticType := fun goal _config => do profileitM Excepti
 
 end bitvecCast
 
+section ValuShape
+inductive ValuShape where
+| exact (v : Valu)
+| struct (ss : List (String × ValuShape))
+| mask (n : Nat) (mask : Int) (v : Int)
+| bits (n : Nat)
+| prop (P : Valu → Prop)
+| unknown
+
+@[irun_simp, irun_solve]
+def Valu.hasShape : Valu → ValuShape → Prop
+| v, .exact v' => v = v'
+| .struct s, .struct s' => s.length = s'.length -- TODO: missing
+| .base <| .bits _b, .mask _n _m _v' => False -- TODO
+| .base <| .bits b, .bits n => b.size = n
+| v, .prop P => P v
+| _, .unknown => True
+| _, _ => False
+
+def hasShapeOkR [BI PROP] (v : Valu) (s : ValuShape) (E : PROP) : PROP :=
+  iprop(⌜v.hasShape s⌝ -∗ E)
+
+@[irun_preprocess]
+def hasShapeOk (v : Valu) (s : ValuShape) : Li PROP Unit where
+  run E := hasShapeOkR v s (E ())
+  mono' E1 E2 := by mysorry
+
+@[irun]
+theorem hasShapeOk_exact v v' E :
+  hasShapeOkR (PROP:=PROP) v (.exact v') E ⊣
+    inhaleR (prop (v = v')) λ _ => E
+    := by mysorry
+
+end ValuShape
+
+
 section subst
 partial def substBaseValExpr (v : Expr) (x : VarName) (e : Expr) : MetaM Expr :=
   match_expr e with
@@ -240,24 +276,6 @@ def _root_.Lean.Expr.regKind? (e : Expr) : Option RegKind :=
     | _, _ => none
   | _ => none
 
-
-inductive ValuShape where
-| exact (v : Valu)
-| struct (ss : List (String × ValuShape))
-| mask (n : Nat) (mask : Int) (v : Int)
-| bits (n : Nat)
-| prop (P : Valu → Prop)
-| unknown
-
-@[irun_simp, irun_solve]
-def Valu.hasShape : Valu → ValuShape → Prop
-| v, .exact v' => v = v'
-| .struct s, .struct s' => s.length = s'.length -- TODO: missing
-| .base <| .bits _b, .mask _n _m _v' => False -- TODO
-| .base <| .bits b, .bits n => b.size = n
-| v, .prop P => P v
-| _, .unknown => True
-| _, _ => False
 
 partial def lookupRegCol (regs : List (RegKind × ValuShape)) (f : RegKind) : Option ValuShape :=
 -- TODO: lookup in fields of a struct
@@ -497,32 +515,32 @@ inductive InstrKind PROP where
 | instr (_ : Option IslaTrace)
 | pre (_ : PROP)
 
-def instrKind (a : BitVec 64) : Atom PROP (InstrKind PROP) := Atom.mk λ
+def instrKind (a : BitVec 64) (pre : Bool) : Atom PROP (InstrKind PROP) := Atom.mk λ
   | .instr i => instr a # i
-  | .pre P => instrPreA a # P
+  | .pre P => if pre then instrPreA a # P else iprop(False)
 
 @[irun]
-theorem instrKind_instr a i :
-  cancelR (PROP:=PROP) (instr a # i) (instrKind a) :- .pure (.instr i) := by mysorry
+theorem instrKind_instr a i pre :
+  cancelR (PROP:=PROP) (instr a # i) (instrKind a pre) :- .pure (.instr i) := by mysorry
 
 @[irun:low]
-theorem instrKind_instr_solve a a' i :
+theorem instrKind_instr_solve a a' i pre:
   a = a' →
-  cancelR (PROP:=PROP) (instr a # i) (instrKind a') :- .pure (.instr i) := by mysorry
+  cancelR (PROP:=PROP) (instr a # i) (instrKind a' pre) :- .pure (.instr i) := by mysorry
 
 @[irun]
 theorem instrKind_instrPre a P :
-  cancelR (PROP:=PROP) (instrPreA a # P) (instrKind a) :- .pure (.pre P) := by mysorry
+  cancelR (PROP:=PROP) (instrPreA a # P) (instrKind a true) :- .pure (.pre P) := by mysorry
 
 @[irun:low]
 theorem instrKind_instrPre_solve a a' P :
   a = a' →
-  cancelR (PROP:=PROP) (instrPreA a # P) (instrKind a') :- .pure (.pre P) := by mysorry
+  cancelR (PROP:=PROP) (instrPreA a # P) (instrKind a' true) :- .pure (.pre P) := by mysorry
 
 @[irun]
 theorem instr_pre_runa la a E :
   instrPre'R (PROP:=PROP) la a E ⊣ (
-    (exhale (PROP:=PROP) (atom (instrKind a))).bind λ
+    (exhale (PROP:=PROP) (atom (instrKind a la))).bind λ
     | .instr (some t) =>
       (dualizing (fromEmpty λ _ => E)).bind λ _ =>
       (inhale (atom_with_ref (reg "_PC") (.base <| .bits a))).bind λ _ =>
@@ -538,7 +556,7 @@ theorem asmOk_nil :
   asmOkR (PROP:=PROP) .nil ⊣ (do
     let .base (.bits (.fromBitVec _ nPC)) ← exhale (atom (reg "_PC")) | fail "pc register is not bitvector"
     let nPC ← bitvecCastOk nPC 64
-    (exhale (atom (instrKind (PROP:=PROP) nPC))).bind λ
+    (exhale (atom (instrKind (PROP:=PROP) nPC true))).bind λ
     | .instr (some t) => do
       (inhale (atom_with_ref (reg "_PC") (.base <| .bits nPC)))
       asmOk t
@@ -591,6 +609,10 @@ theorem unopOk_zeroExtend {n} (b : BitVec n) m :
 @[irun]
 theorem binopOk_eq_bits {n} (b1 b2 : BitVec n) :
   binopOkR (PROP:=PROP) (Binop.eq) (BaseVal.bits b1) (BaseVal.bits b2) :-
+    do return (.bool (b1 = b2)) := by mysorry
+@[irun]
+theorem binopOk_eq_bool (b1 b2 : Bool) :
+  binopOkR (PROP:=PROP) (Binop.eq) (BaseVal.bool b1) (BaseVal.bool b2) :-
     do return (.bool (b1 = b2)) := by mysorry
 
 @[irun]
@@ -663,7 +685,7 @@ theorem aexpOk_var re :
     | .regCol regs =>
       let s ← lookupRegColOk regs (.reg re)
       let v : Valu ← all
-      inhale (prop (v.hasShape s))
+      hasShapeOk v s
       let .base v' := v | fail "variable is not BaseVal"
       inhale (atom_with_ref (regCol regs) ())
       return v'
@@ -684,6 +706,17 @@ end exp
 
 section events
 
+@[irun:high]
+theorem asmOk_cases1 t:
+  asmOkR (PROP:=PROP) (.cases [t]) ⊣ (do asmOk t).go := by mysorry
+
+@[irun]
+theorem asmOk_cases_cons t ts:
+  asmOkR (PROP:=PROP) (.cases (t::ts)) ⊣ (do
+    branch
+      (asmOk t)
+      (asmOk (.cases ts))).go := by mysorry
+
 @[irun]
 theorem asmOk_readReg re v t:
   asmOkR (PROP:=PROP) (.cons (.readReg re [] v) t) ⊣ (do
@@ -696,7 +729,7 @@ theorem asmOk_readReg re v t:
    | .regCol regs =>
      let s ← lookupRegColOk regs (.reg re)
      inhale (atom_with_ref (regCol regs) ())
-     inhale (prop (v.hasShape s))
+     hasShapeOk v s
      asmOk t
      ).go := by mysorry
 
@@ -713,7 +746,7 @@ theorem asmOk_readReg_struct re v f t:
    | .regCol regs =>
      let s ← lookupRegColOk regs (.field re f)
      inhale (atom_with_ref (regCol regs) ())
-     inhale (prop (vread.hasShape s))
+     hasShapeOk vread s
      asmOk t
      ).go := by mysorry
 
@@ -791,7 +824,11 @@ theorem asmOk_assumeReg re v t:
      asmOk t
    | .regCol regs =>
      let s ← lookupRegColOk regs (.reg re)
-     exhale (prop (∀ v' : Valu, v'.hasShape s → v' = v))
+     branch (do
+       let v' ← all
+       hasShapeOk v' s
+       exhale (prop (v' = v))
+       done) do
      inhale (atom_with_ref (regCol regs) ())
      asmOk t
      ).go := by mysorry
@@ -824,7 +861,14 @@ theorem asmOk_readMem {n na} (vread : BitVec n) (a : BitVec na) kind len tag t :
      inhale (prop (vread = v))
      inhale (atom_with_ref (ptsto a n') v)
      asmOk t
-   | .array _a' _n _len _vs => fail "readMem array"
+   | .array a' n' len' vs =>
+     exhale (prop ((a - a') % len = 0))
+     let i := ((a - a') / len).toNat
+     exhale (prop (i < len'))
+     let vread ← bitvecCastOk vread n'
+     inhale (prop (vread = vs[i]!))
+     inhale (atom_with_ref (array a' n' len') vs)
+     asmOk t
    | .uninit _a' _len => fail "readMem uninit"
    | .mmio _a' _len => fail "readMem mmio"
      ).go := by mysorry
