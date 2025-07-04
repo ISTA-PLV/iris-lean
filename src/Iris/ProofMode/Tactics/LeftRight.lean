@@ -21,7 +21,7 @@ elab "ileft" : tactic => do
   let A2 ← mkFreshExprMVarQ prop
   let _ ← synthInstanceQ q(FromOr $goal $A1 $A2)
   let m : Q($e ⊢ $A1) ← mkFreshExprSyntheticOpaqueMVar <|
-    IrisGoal.toExpr { u, prop, bi, e, hyps, goal := A1 }
+    IrisGoal.toExpr { u, prop, bi, hyps, goal := A1, .. }
   mvar.assign q(from_or_l (Q := $goal) $m)
   replaceMainGoal [m.mvarId!]
 
@@ -38,6 +38,6 @@ elab "iright" : tactic => do
   let A2 ← mkFreshExprMVarQ prop
   let _ ← synthInstanceQ q(FromOr $goal $A1 $A2)
   let m : Q($e ⊢ $A2) ← mkFreshExprSyntheticOpaqueMVar <|
-    IrisGoal.toExpr { u, prop, bi, e, hyps, goal := A2 }
+    IrisGoal.toExpr { u, prop, bi, hyps, goal := A2, .. }
   mvar.assign q(from_or_r (Q := $goal) $m)
   replaceMainGoal [m.mvarId!]
