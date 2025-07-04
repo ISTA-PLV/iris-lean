@@ -398,6 +398,8 @@ def irunCancelRegCol : IRunTacticType := fun goal _config => do profileitM Excep
         mkApp7 (.const ``cancel_regStructPtsto_regCol_tac [u]) prop bi regs re f E hyp)
       | _, _ => none
     | _ => none) | return none
+  -- if _config.debug then
+    -- logInfo m!"Looking up {toExpr f} in {regs}"
   let some _ ← lookupRegColExpr regs f | return none
   let res := mkApp (mkConst cst) regs
   let m ← mkFreshExprSyntheticOpaqueMVar <| IrisGoalShallow.toExpr { ig with goal := Expr.beta E #[res] }

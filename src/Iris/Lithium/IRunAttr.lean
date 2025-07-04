@@ -66,20 +66,21 @@ def IRunEntrySerialized.deserialize (e : IRunEntrySerialized) (compile : Bool) :
   let tac  ← match e.tac with
     | .inl n => .pure (.inl n)
     | .inr n => unsafe do
+      let mut name := n.name
       let ty := (← getConstInfo n.name).type
       if ty != .const ``IRunTacticType [] then
         throwError "The tactic should have type IRunTacticType."
       if compile then
         -- is this the compilation the right thing to do?
-        let .defnInfo d ← getConstInfo n.name |
-          throwError "The tactic should be a definition."
-        let decl := (.defnDecl d)
+        let d ← getConstInfoDefn n.name
+        name := d.name ++ `_replay
+        let decl := (.defnDecl {d with name := name})
         try
           withOptions (λ opt => Elab.async.set opt false) <|
-            compileDecl decl
+            addAndCompile decl
         catch e =>
           IO.println s!"error while compiling {n.name}: {← e.toMessageData.toString}"
-      let tac ← evalConst IRunTacticType n.name
+      let tac ← evalConst IRunTacticType name
       return (.inr ⟨tac, n.name⟩ : Name ⊕ IRunTactic)
   return {tac, prio := e.prio, name := e.name}
 
