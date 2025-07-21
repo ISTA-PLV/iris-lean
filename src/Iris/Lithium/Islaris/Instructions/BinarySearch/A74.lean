@@ -1,0 +1,42 @@
+import Iris.Lithium.Islaris.Isla
+
+namespace Islaris.Instructions.BinarySearch
+
+set_option maxRecDepth 30000 in
+abbrev a74 : IslaTrace := isla%
+(trace
+  (assume-reg |__currentInstrLength| nil (_ bv4 128))
+  (assume-reg |__isla_vector_gpr| nil false)
+  (assume-reg |__v85_implemented| nil false)
+  (define-enum |signal| 2 (|LOW| |HIGH|))
+  (cycle)
+  (read-reg |SEE| nil (_ bv-1 128))
+  (write-reg |SEE| nil (_ bv1129 128))
+  (write-reg |__unconditional| nil true)
+  (define-enum |ShiftType| 4 (|ShiftType_LSL| |ShiftType_LSR| |ShiftType_ASR| |ShiftType_ROR|))
+  (define-enum |ArchVersion| 6 (|ARMv8p0| |ARMv8p1| |ARMv8p2| |ARMv8p3| |ARMv8p4| |ARMv8p5|))
+  (read-reg |__v85_implemented| nil false)
+  (read-reg |__isla_vector_gpr| nil false)
+  (declare-const v27 (_ BitVec 64)) 
+  (read-reg |R0| nil v27)
+  (define-const v28 v27)
+  (declare-const v29 (_ BitVec 64)) 
+  (read-reg |R1| nil v29)
+  (define-const v35 (bvnot v29))
+  (define-const v39 (bvadd (bvadd ((_ zero_extend 64) v28) ((_ zero_extend 64) v35)) #x00000000000000000000000000000001))
+  (define-const v44 ((_ extract 63 0) v39))
+  (define-const v57 (concat (concat (concat (bvor (bvand #b0 (bvnot #b1)) ((_ extract 0 0) (bvlshr v44 ((_ extract 63 0) #x0000000000000000000000000000003f)))) (ite (= v44 #x0000000000000000) #b1 #b0)) (ite (= ((_ zero_extend 64) v44) v39) #b0 #b1)) (ite (= ((_ sign_extend 64) v44) (bvadd (bvadd ((_ sign_extend 64) v28) ((_ sign_extend 64) v35)) #x00000000000000000000000000000001)) #b0 #b1)))
+  (define-const v58 ((_ extract 3 3) v57))
+  (write-reg |PSTATE| ((_ field |N|)) (_ struct (|N| v58)))
+  (define-const v59 ((_ extract 2 2) v57))
+  (write-reg |PSTATE| ((_ field |Z|)) (_ struct (|Z| v59)))
+  (define-const v60 ((_ extract 1 1) v57))
+  (write-reg |PSTATE| ((_ field |C|)) (_ struct (|C| v60)))
+  (define-const v61 ((_ extract 0 0) v57))
+  (write-reg |PSTATE| ((_ field |V|)) (_ struct (|V| v61)))
+  (read-reg |__PC_changed| nil false)
+  (declare-const v62 (_ BitVec 64)) 
+  (read-reg |_PC| nil v62)
+  (read-reg |__currentInstrLength| nil (_ bv4 128))
+  (define-const v63 (bvadd v62 #x0000000000000004))
+  (write-reg |_PC| nil v63))
