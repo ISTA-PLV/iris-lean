@@ -224,7 +224,7 @@ theorem valid_opM {x : α} {my : Option α} : ✓ (x •? my) → ✓ x :=
   match my with
   | none => id  | some _ => valid_op_left
 
-theorem validN_op_opM_left {mz : Option α} : ✓{n} (x • y) •? mz → ✓{n} x •? mz :=
+theorem validN_op_opM_left {mz : Option α} : ✓{n} (x • y : α) •? mz → ✓{n} x •? mz :=
   match mz with
   | .none => validN_op_left
   | .some z => fun h =>
@@ -234,7 +234,7 @@ theorem validN_op_opM_left {mz : Option α} : ✓{n} (x • y) •? mz → ✓{n
       _           ≡{n}≡ (x • z) • y := op_assocN
     validN_op_left ((Dist.validN this).mp h)
 
-theorem validN_op_opM_right {mz : Option α} (h : ✓{n} (x • y) •? mz) : ✓{n} y •? mz :=
+theorem validN_op_opM_right {mz : Option α} (h : ✓{n} (x • y : α) •? mz) : ✓{n} y •? mz :=
   validN_op_opM_left (validN_ne (opM_left_dist mz op_commN) h)
 
 /-! ## Core -/
@@ -1047,19 +1047,19 @@ instance cmraOption : CMRA (Option α) where
     cases x <;> simp [optionValid, optionValidN]
     exact CMRA.valid_iff_validN
   validN_succ {x n} := by
-    cases x <;> simp_all [Dist, optionValidN]
+    cases x <;> simp_all [optionValidN]
     apply CMRA.validN_succ
   validN_op_left {n x y} := by
-    cases x <;> cases y <;> simp_all [Dist, optionOp, optionValidN]
+    cases x <;> cases y <;> simp_all [optionOp, optionValidN]
     apply CMRA.validN_op_left
   assoc {x y z} := by
-    cases x <;> cases y <;> cases z <;> simp_all [Dist, Equiv, Option.Forall₂, optionOp]
+    cases x <;> cases y <;> cases z <;> simp_all [Equiv, Option.Forall₂, optionOp]
     apply CMRA.assoc
   comm {x y} := by
-    cases x <;> cases y <;> simp_all [Dist, Equiv, Option.Forall₂, optionOp]
+    cases x <;> cases y <;> simp_all [Equiv, Option.Forall₂, optionOp]
     apply CMRA.comm
   pcore_op_left {x cx} := by
-    cases x <;> cases cx <;> simp_all [Dist, Equiv, Option.Forall₂, optionCore, optionOp]
+    cases x <;> cases cx <;> simp_all [Equiv, Option.Forall₂, optionCore, optionOp]
     apply CMRA.pcore_op_left
   pcore_idem := by
     simp; rintro (_|x) <;> simp [Equiv, Option.Forall₂, optionCore]
@@ -1077,7 +1077,7 @@ instance cmraOption : CMRA (Option α) where
     exact ⟨some cy, H⟩
   extend {n} := by
     rintro (_|x) (_|mb1) (_|mb2) <;> simp [optionValidN, optionOp]
-      <;> intros Hx Hx' <;> try simp [Dist, Option.Forall₂] at Hx'
+      <;> intros Hx Hx' <;> try simp at Hx'
     · exists none, none
     · exists none, some x
     · exists some x, none
