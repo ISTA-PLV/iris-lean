@@ -81,8 +81,7 @@ def Li.pure (a : α) : Li PROP α := {
   run E := E a
   mono' E1 E2 := by
     iintro HE Hwand
-    ispecialize Hwand HE
-    iassumption
+    iapply Hwand $! _ with HE
 }
 
 @[irun_preprocess]
@@ -113,10 +112,9 @@ def exhale (L : InEx PROP α) : Li PROP α := {
     dsimp [exhaleR]
     iintro ⟨a, HL, HE⟩ Hwand
     iexists a
-    isplit l [HL]
-    iassumption
-    ispecialize Hwand HE
-    iassumption
+    isplitl [HL]
+    · iassumption
+    · iapply Hwand $! _ with HE
 }
 
 def inhaleR (L : InEx PROP α) (E : α → PROP) : PROP :=
@@ -128,8 +126,8 @@ def inhale (L : InEx PROP α) : Li PROP α := {
   mono' E1 E2 := by
     dsimp [inhaleR]
     iintro HE Hwand a HL
-    ispecialize HE HL
-    ispecialize Hwand HE
+    iapply Hwand $! _
+    iapply HE $! _
     iassumption
 }
 
@@ -153,9 +151,8 @@ def all {α : Type v} : Li PROP α := {
   mono' E1 E2 := by
     dsimp [allR]
     iintro HE Hwand a
-    ispecialize HE a
-    ispecialize Hwand HE
-    iassumption
+    iapply Hwand $! _
+    iapply HE $! _
 }
 
 def doneR : PROP := iprop(True)
@@ -232,9 +229,8 @@ def dualizing (G : Li PROP Empty) : Li PROP Unit := {
   mono' E1 E2 := by
     dsimp [dualizingR]
     iintro HE Hwand HG
-    ispecialize HE HG
-    ispecialize Hwand HE
-    iassumption
+    iapply Hwand $! _
+    iapply HE with HG
 }
 
 @[irun_preprocess]

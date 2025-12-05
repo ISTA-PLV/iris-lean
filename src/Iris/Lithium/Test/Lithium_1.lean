@@ -92,8 +92,7 @@ def pure (a : α) : @LithiumM PROP _ α := {
   run E := E a
   mono' E1 E2 := by
     iintro HE Hwand
-    ispecialize Hwand HE
-    iassumption
+    iapply Hwand $! _ with HE
 }
 
 def bind (G1 : @LithiumM PROP _ α) (G2 : α → @LithiumM PROP _ β) :
@@ -118,28 +117,25 @@ def exhale (L : @InExM PROP α) : @LithiumM PROP _ α := {
   mono' E1 E2 := by
     iintro ⟨a, HL, HE⟩ Hwand
     iexists a
-    isplit l [HL]
-    iassumption
-    ispecialize Hwand HE
-    iassumption
+    isplitl [HL]
+    · iassumption
+    · iapply Hwand $! _ with HE
 }
 
 def inhale (L : @InExM PROP α) : @LithiumM PROP _ α := {
   run E := iprop(∀ a, L.body a -∗ E a)
   mono' E1 E2 := by
     iintro HE Hwand a HL
-    ispecialize HE HL
-    ispecialize Hwand HE
-    iassumption
+    iapply Hwand $! _
+    iapply HE $! _ with HL
 }
 
 def all (α : Type v) : @LithiumM PROP _ α := {
   run E := iprop(∀ a, E a)
   mono' E1 E2 := by
     iintro HE Hwand a
-    ispecialize HE a
-    ispecialize Hwand HE
-    iassumption
+    iapply Hwand $! _
+    iapply HE $! _ with HL
 }
 
 def done : @LithiumM PROP _ α := {
@@ -169,18 +165,16 @@ def dualizing (G : @LithiumM PROP _ Empty) : @LithiumM PROP _ Unit := {
   run E := iprop(G.run empty -∗ E ⟨⟩)
   mono' E1 E2 := by
     iintro HE Hwand HG
-    ispecialize HE HG
-    ispecialize Hwand HE
-    iassumption
+    iapply Hwand $! _
+    iapply HE with HG
 }
 
 def dualizingP (G : @LithiumM PROP _ PEmpty) : @LithiumM PROP _ PUnit := {
   run E := iprop(G.run emptyP -∗ E ⟨⟩)
   mono' E1 E2 := by
     iintro HE Hwand HG
-    ispecialize HE HG
-    ispecialize Hwand HE
-    iassumption
+    iapply Hwand $! _
+    iapply HE with HG
 }
 
 -- TODO: What are good precedences?
@@ -203,12 +197,12 @@ end LithiumM
 theorem run_bind (G1 : @LithiumM PROP _ α) (G2 : α → LithiumM β)
   (E : β → PROP) :
    G1.bind G2 ⇓ E ⊣ (G1 ⇓ λ b => G2 b ⇓ E) := by
-    simp [LithiumM.bind, LithiumM.run, LithiumM.run]
+    simp [LithiumM.bind]
 
 @[irun]
 theorem run_pure (a : α) (E : α → PROP) :
    .pure a ⇓ E ⊣ E a := by
-    simp [LithiumM.pure, LithiumM.run, LithiumM.run]
+    simp [LithiumM.pure]
 
 @[irun]
 theorem exhale_bind (L1 : @InExM PROP α) (L2 : α → InExM β) E :
