@@ -371,8 +371,7 @@ set_option Elab.async false in
 example :
   ⊢ fn_spec (PROP:=PROP) rec_fn # ⟨Nat, λ va => exhale (natL va), λ _ _ => done⟩ := by
   unfold rec_fn
-  apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
-  istart
+  iapply (prove_fn_spec (PROP:=PROP))
   simp only [irun_preprocess]
   irun
 
@@ -398,17 +397,15 @@ def echo_spec PROP [BI PROP] : PROP :=
 theorem echo_ok :
   ⊢ echo_spec PROP := by
   unfold echo_spec echo_fn
-  apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
-  istart
+  iapply (prove_fn_spec (PROP:=PROP))
   simp only [irun_preprocess]
   irun
 
 theorem main_ok [BIAffine PROP] :
   echo_spec PROP ⊢ (fn_spec main_fn) # ⟨_, λ _ => .pure (), λ _ vr => do exhale (prop (vr = .nat 1)); done⟩ := by
   unfold echo_spec main_fn getc_fn putc_fn
-  apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
-  istart
-  iintro x
+  iintro _
+  iapply (prove_fn_spec (PROP:=PROP))
   simp only [irun_preprocess]
   irun
 
@@ -434,8 +431,7 @@ theorem fib_ok [BIAffine PROP] :
     λ va => do {let n ← exhale (natL va); exhale (prop (0 ≤ n)); return n},
     λ n vr => do {let nr ← exhale (natL vr); exhale (prop (nr = fib n)); done}⟩ := by
   unfold fib_fn
-  apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
-  istart
+  iapply (prove_fn_spec (PROP:=PROP))
   simp only [irun_preprocess]
   irun
   · rename Nat => x
@@ -529,8 +525,7 @@ theorem empty_ok [BIAffine PROP] :
     λ _ => do {return ()},
     λ _ vr => do {let vs ← exhale (atom (is_list vr)); exhale (prop (vs = [])); done}⟩ := by
   unfold empty_fn
-  apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
-  istart
+  iapply (prove_fn_spec (PROP:=PROP))
   simp only [irun_preprocess]
   irun
 
@@ -539,8 +534,7 @@ theorem cons_ok [BIAffine PROP] :
     λ va => do {let (x, v) ← exhale (pairL va); let xs ← exhale (atom (is_list v)); return (x, xs)},
     λ (x, xs) vr => do {let vs ← exhale (atom (is_list vr)); exhale (prop (vs = x::xs)); done}⟩ := by
   unfold cons_fn
-  apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
-  istart
+  iapply (prove_fn_spec (PROP:=PROP))
   simp only [irun_preprocess]
   irun
 
@@ -555,9 +549,8 @@ theorem mklist_ok [BIAffine PROP] :
     λ _ => do {return ()},
     λ _ vr => do {let vs ← exhale (atom (is_list vr)); exhale (prop (vs = [.nat 2, .nat 1])); done}⟩ := by
   unfold mklist_fn
-  apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
-  istart
   iintro ⟨□ h1, □ h2⟩
+  iapply (prove_fn_spec (PROP:=PROP))
   simp only [irun_preprocess]
   irun
 
@@ -569,8 +562,7 @@ theorem head_ok :
     λ va => do {let xs ← exhale (atom (is_list va)); exhale (prop (0 < xs.length)); return (va, xs)},
     λ (va, xs) vr => do {exhale (atom_with_ref (is_list va) xs); exhale (prop (xs.head? = some vr)); done}⟩ := by
   unfold head_fn
-  apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
-  istart
+  iapply (prove_fn_spec (PROP:=PROP))
   simp only [irun_preprocess]
   irun
 
@@ -585,8 +577,7 @@ theorem length_ok :
     λ va => do {let xs ← exhale (atom (is_list va)); return (va, xs)},
     λ (va, xs) vr => do {exhale (atom_with_ref (is_list va) xs); exhale (prop (vr = .nat xs.length)); done}⟩ := by
   unfold length_fn
-  apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
-  istart
+  iapply (prove_fn_spec (PROP:=PROP))
   simp only [irun_preprocess]
   irun
   rename List Val => xs
@@ -628,8 +619,7 @@ set_option Elab.async false in
 #time theorem contains_ok [BIAffine PROP] P :
   ⊢ contains_spec (PROP:=PROP) P := by
   unfold contains_spec contains_spec_pre contains_spec_post contains_fn
-  apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
-  istart
+  iapply (prove_fn_spec (PROP:=PROP))
   simp only [irun_preprocess]
   irun
   rename List Val => xs

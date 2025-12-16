@@ -92,7 +92,7 @@ def pure (a : α) : @LithiumM PROP _ α := {
   run E := E a
   mono' E1 E2 := by
     iintro HE Hwand
-    iapply Hwand $! _ with HE
+    iapply Hwand $! a with HE
 }
 
 def bind (G1 : @LithiumM PROP _ α) (G2 : α → @LithiumM PROP _ β) :
@@ -119,7 +119,7 @@ def exhale (L : @InExM PROP α) : @LithiumM PROP _ α := {
     iexists a
     isplitl [HL]
     · iassumption
-    · iapply Hwand $! _ with HE
+    · iapply Hwand $! a with HE
 }
 
 def inhale (L : @InExM PROP α) : @LithiumM PROP _ α := {
@@ -127,7 +127,7 @@ def inhale (L : @InExM PROP α) : @LithiumM PROP _ α := {
   mono' E1 E2 := by
     iintro HE Hwand a HL
     iapply Hwand $! _
-    iapply HE $! _ with HL
+    iapply HE $! a with HL
 }
 
 def all (α : Type v) : @LithiumM PROP _ α := {
@@ -135,7 +135,7 @@ def all (α : Type v) : @LithiumM PROP _ α := {
   mono' E1 E2 := by
     iintro HE Hwand a
     iapply Hwand $! _
-    iapply HE $! _ with HL
+    iapply HE
 }
 
 def done : @LithiumM PROP _ α := {

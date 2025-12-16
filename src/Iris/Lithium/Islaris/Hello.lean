@@ -122,7 +122,7 @@ macro_rules
  | `(tactic|irunsolve) => `(tactic|trivial)
 
 -- set_option profiler true in
-set_option trace.profiler true in
+-- set_option trace.profiler true in
 set_option Elab.async false in
 #time
 theorem hello_loop (i : BitVec 64) :

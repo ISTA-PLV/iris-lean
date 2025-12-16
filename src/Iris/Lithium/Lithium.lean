@@ -81,7 +81,7 @@ def Li.pure (a : α) : Li PROP α := {
   run E := E a
   mono' E1 E2 := by
     iintro HE Hwand
-    iapply Hwand $! _ with HE
+    iapply Hwand $! a with HE
 }
 
 @[irun_preprocess]
@@ -114,7 +114,7 @@ def exhale (L : InEx PROP α) : Li PROP α := {
     iexists a
     isplitl [HL]
     · iassumption
-    · iapply Hwand $! _ with HE
+    · iapply Hwand $! a with HE
 }
 
 def inhaleR (L : InEx PROP α) (E : α → PROP) : PROP :=
@@ -152,7 +152,7 @@ def all {α : Type v} : Li PROP α := {
     dsimp [allR]
     iintro HE Hwand a
     iapply Hwand $! _
-    iapply HE $! _
+    iapply HE
 }
 
 def doneR : PROP := iprop(True)

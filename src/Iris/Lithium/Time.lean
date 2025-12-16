@@ -15,8 +15,7 @@ set_option Elab.async false in
 example [BI PROP] [BIAffine PROP] P :
   ⊢ contains_spec (PROP:=PROP) P := by
   unfold contains_spec contains_spec_pre contains_spec_post contains_fn
-  apply (BI.BIBase.Entails.trans _ (prove_fn_spec _ _ _))
-  istart
+  iapply (prove_fn_spec (PROP:=PROP))
   simp only [irun_preprocess]
   irun
   rename List Val => xs
