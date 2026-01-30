@@ -36,6 +36,10 @@ def irunTest : IRunTacticType := fun _goal _config => do
   IO.println s!"Test Tac"
   return none
 
+theorem intro_emp_tac [BI PROP] {A Q : PROP}
+  (h : A ⊢ Q)
+ : emp ⊢ A -∗ Q := wand_intro (emp_sep.1.trans h)
+
 theorem intro_tac [BI PROP] {P A Q : PROP}
   (h : P ∗ A ⊢ Q)
  : P ⊢ A -∗ Q := wand_intro h
@@ -45,19 +49,24 @@ def irunIntro : IRunTacticType := fun goal _config => do profileitM Exception "i
   let { u, prop, bi, hyp, goal:=G } := goal
   let_expr wand _ _ A Q := G | return none
   let .some ⟨e, hyps⟩ := parseHypsFromShallow? u prop bi hyp | return none
-  let ident ← `(binderIdent| _)
-  let (b, A') := if A.isAppOfArity ``intuitionistically 3 then
+  let (p, A') := if A.isAppOfArity ``intuitionistically 3 then
       (q(true), A.getArg! 3)
     else
       (q(false), A)
-  let goals ← IO.mkRef #[]
-  let pf ← iCasesCore bi hyps Q b A A' ⟨⟩ (.one ident) fun hyps => do
+  let (name, ref) ← getFreshName (← `(binderIdent| _))
+  let uniq ← mkFreshId
+  addHypInfo (u:=u) ref name uniq prop A' (isBinder := true)
+  let hyp := .mkHyp bi name uniq p A'
+  if let .emp _ := hyps then
     let m ← mkFreshExprSyntheticOpaqueMVar <|
-      IrisGoal.toExpr { u, prop, bi, e:=_, hyps, goal:=Q }
-    goals.modify (·.push m.mvarId!)
-    return m
-  let pf := mkApp6 (.const ``intro_tac [u]) prop bi e A Q pf
-  return .some (pf, (← goals.get).toList, [])
+      IrisGoal.toExpr { u, prop, bi, e:=_, hyps:=hyp, goal:=Q }
+    let pf := mkApp5 (.const ``intro_emp_tac [u]) prop bi A Q m
+    return .some (pf, [m.mvarId!], [])
+  else
+    let m ← mkFreshExprSyntheticOpaqueMVar <|
+      IrisGoal.toExpr { u, prop, bi, e:=_, hyps:=.mkSep hyps hyp, goal:=Q }
+    let pf := mkApp6 (.const ``intro_tac [u]) prop bi e A Q m
+    return .some (pf, [m.mvarId!], [])
 
 theorem cancel [BI PROP] {p : Bool} {P P' A Q' : PROP}
   (hP : P ⊣⊢ P' ∗ □?p A)

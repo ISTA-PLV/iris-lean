@@ -81,7 +81,7 @@ def Li.pure (a : α) : Li PROP α := {
   run E := E a
   mono' E1 E2 := by
     iintro HE Hwand
-    iapply Hwand $! a with HE
+    iapply Hwand $$ HE
 }
 
 @[irun_preprocess]
@@ -110,11 +110,11 @@ def exhale (L : InEx PROP α) : Li PROP α := {
   run := exhaleR L
   mono' E1 E2 := by
     dsimp [exhaleR]
-    iintro ⟨a, HL, HE⟩ Hwand
+    iintro ⟨%a, HL, HE⟩ Hwand
     iexists a
     isplitl [HL]
     · iassumption
-    · iapply Hwand $! a with HE
+    · iapply Hwand $$ HE
 }
 
 def inhaleR (L : InEx PROP α) (E : α → PROP) : PROP :=
@@ -125,9 +125,9 @@ def inhale (L : InEx PROP α) : Li PROP α := {
   run := inhaleR L
   mono' E1 E2 := by
     dsimp [inhaleR]
-    iintro HE Hwand a HL
-    iapply Hwand $! _
-    iapply HE $! _
+    iintro HE Hwand %a HL
+    iapply Hwand
+    iapply HE
     iassumption
 }
 
@@ -150,8 +150,8 @@ def all {α : Type v} : Li PROP α := {
   run := @allR _ _ α
   mono' E1 E2 := by
     dsimp [allR]
-    iintro HE Hwand a
-    iapply Hwand $! _
+    iintro HE Hwand %a
+    iapply Hwand
     iapply HE
 }
 
@@ -229,8 +229,8 @@ def dualizing (G : Li PROP Empty) : Li PROP Unit := {
   mono' E1 E2 := by
     dsimp [dualizingR]
     iintro HE Hwand HG
-    iapply Hwand $! _
-    iapply HE with HG
+    iapply Hwand
+    iapply HE $$ HG
 }
 
 @[irun_preprocess]
@@ -298,6 +298,12 @@ theorem inhale_atom [BI PROP] {α : Type _} A (E : α → PROP) :
    by mysorry
 
 
+theorem inhale_atom_with_ref_emp_tac {α : Type _} [BI PROP] (A : Atom PROP α) (a : α) (E : Unit → PROP)
+  (_h : A # a ⊢ E ())
+ : emp ⊢ (inhaleR (atom_with_ref A a)) E := by
+    simp [inhaleR, atom_with_ref]
+    mysorry
+
 theorem inhale_atom_with_ref_tac {α : Type _} [BI PROP] {P : PROP} (A : Atom PROP α) (a : α) (E : Unit → PROP)
   (_h : P ∗ A # a ⊢ E ())
  : P ⊢ (inhaleR (atom_with_ref A a)) E := by
@@ -311,17 +317,28 @@ def irunInhaleAtomWithRef : IRunTacticType := fun goal _config => do profileitM 
   let_expr atom_with_ref _ α A a := L | return none
   let .some ⟨e, hyps⟩ := parseHypsFromShallow? u prop bi hyp | return none
   let us := L.getAppFn'.constLevels!
-  let ident ← `(binderIdent| _)
-  let goals ← IO.mkRef #[]
-  let Q := Expr.beta E #[mkConst ``Unit.unit]
   let A' := mkApp4 (.const ``Atom.ref us) prop α A a
-  let pf ← iCasesCore bi hyps Q q(false) A' A' ⟨⟩ (.one ident) fun hyps => do
+  let Q := Expr.beta E #[mkConst ``Unit.unit]
+  let (name, ref) ← getFreshName (← `(binderIdent| _))
+  let uniq ← mkFreshId
+  addHypInfo (u:=u) ref name uniq prop A' (isBinder := true)
+  let hyp := .mkHyp bi name uniq q(false) A'
+  if let .emp _ := hyps then
     let m ← mkFreshExprSyntheticOpaqueMVar <|
-      IrisGoal.toExpr { u, prop, bi, e:=_, hyps, goal:=Q }
-    goals.modify (·.push m.mvarId!)
-    return m
-  let pf := mkApp8 (.const ``inhale_atom_with_ref_tac us) prop α bi e A a E pf
-  return .some (pf, (← goals.get).toList, [])
+      IrisGoal.toExpr { u, prop, bi, e:=_, hyps:=hyp, goal:=Q }
+    let pf := mkApp7 (.const ``inhale_atom_with_ref_emp_tac us) prop α bi A a E m
+    return .some (pf, [m.mvarId!], [])
+  else
+    let m ← mkFreshExprSyntheticOpaqueMVar <|
+      IrisGoal.toExpr { u, prop, bi, e:=_, hyps:=.mkSep hyps hyp, goal:=Q }
+    let pf := mkApp8 (.const ``inhale_atom_with_ref_tac us) prop α bi e A a E m
+    return .some (pf, [m.mvarId!], [])
+
+theorem inhale_pers_atom_with_ref_emp_tac {α : Type _} [BI PROP] (A : Atom PROP α) (a : α) (E : Unit → PROP)
+  (_h : □ A # a ⊢ E ())
+ : emp ⊢ (inhaleR (pers (atom_with_ref A a))) E := by
+    simp [inhaleR, atom_with_ref]
+    mysorry
 
 theorem inhale_pers_atom_with_ref_tac {α : Type _} [BI PROP] {P : PROP} (A : Atom PROP α) (a : α) (E : Unit → PROP)
   (_h : P ∗ □ A # a ⊢ E ())
@@ -338,18 +355,22 @@ def irunInhalePersAtomWithRef : IRunTacticType := fun goal _config => do profile
   let_expr atom_with_ref _ α A a := L | return none
   let .some ⟨e, hyps⟩ := parseHypsFromShallow? u prop bi hyp | return none
   let us := L.getAppFn'.constLevels!
-  let ident ← `(binderIdent| _)
-  let goals ← IO.mkRef #[]
   let Q := Expr.beta E #[mkConst ``Unit.unit]
   let A' := mkApp4 (.const ``Atom.ref us) prop α A a
-  let A'' := mkApp3 (.const ``intuitionistically [u]) prop (mkApp2 (.const ``BI.toBIBase [u]) prop bi) A'
-  let pf ← iCasesCore bi hyps Q q(true) A'' A' ⟨⟩ (.one ident) fun hyps => do
+  let (name, ref) ← getFreshName (← `(binderIdent| _))
+  let uniq ← mkFreshId
+  addHypInfo (u:=u) ref name uniq prop A' (isBinder := true)
+  let hyp := .mkHyp bi name uniq q(true) A'
+  if let .emp _ := hyps then
     let m ← mkFreshExprSyntheticOpaqueMVar <|
-      IrisGoal.toExpr { u, prop, bi, e:=_, hyps, goal:=Q }
-    goals.modify (·.push m.mvarId!)
-    return m
-  let pf := mkApp8 (.const ``inhale_pers_atom_with_ref_tac us) prop α bi e A a E pf
-  return .some (pf, (← goals.get).toList, [])
+      IrisGoal.toExpr { u, prop, bi, e:=_, hyps:=hyp, goal:=Q }
+    let pf := mkApp7 (.const ``inhale_pers_atom_with_ref_emp_tac us) prop α bi A a E m
+    return .some (pf, [m.mvarId!], [])
+  else
+    let m ← mkFreshExprSyntheticOpaqueMVar <|
+      IrisGoal.toExpr { u, prop, bi, e:=_, hyps:=.mkSep hyps hyp, goal:=Q }
+    let pf := mkApp8 (.const ``inhale_pers_atom_with_ref_tac us) prop α bi e A a E m
+    return .some (pf, [m.mvarId!], [])
 
 theorem inhale_prop_tac [BI PROP] φ (P : PROP) E
   (_h : φ → P ⊢ E ())

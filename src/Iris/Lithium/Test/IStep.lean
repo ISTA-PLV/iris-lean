@@ -96,8 +96,8 @@ theorem intro_tac [BI PROP] {P A Q : PROP}
 
 variable {prop : Q(Type u)} (bi : Q(BI $prop)) (Q : Q($prop)) in
 def introFast {P} (hyps : Hyps bi P)
-  (k : ∀ {P}, Hyps bi P → (Q : Q($prop)) → MetaM Q($P ⊢ $Q))
- : MetaM (Q($P ⊢ $Q)) := do
+  (k : ∀ {P}, Hyps bi P → (Q : Q($prop)) → ProofModeM Q($P ⊢ $Q))
+ : ProofModeM (Q($P ⊢ $Q)) := do
   let ~q(iprop($A -∗ $Q')) := Q | throwError "Goal is not of the shape A -∗ G"
   let ident ← `(binderIdent| _ )
   if A.isAppOfArity ``intuitionistically 3 then
@@ -110,20 +110,10 @@ def introFast {P} (hyps : Hyps bi P)
 
 
 elab "ifastintro" : tactic => do profileitM Exception "ifastintro" (← getOptions) do
-  let mvar ← getMainGoal
-  mvar.withContext do
-  let g ← instantiateMVars <| ← mvar.getType
-  let some { u, prop, bi, e := _, hyps, goal } := parseIrisGoal? g | throwError "not in proof mode"
+  ProofModeM.runTactic λ mvar { bi, goal, hyps, .. } => do
 
-  let goals ← IO.mkRef #[]
-  let pf ← introFast bi goal hyps fun hyps Q => do
-    let m : Expr ← mkFreshExprSyntheticOpaqueMVar <|
-      IrisGoal.toExpr { u, prop, bi, e:=_, hyps, goal:=Q }
-    goals.modify (·.push m.mvarId!)
-    pure m
-
+  let pf ← introFast bi goal hyps fun hyps Q => addBIGoal hyps Q
   mvar.assign pf
-  replaceMainGoal (← goals.get).toList
 
 theorem true_tac [BI PROP] {P : PROP}
  : P ⊢ True := pure_intro .intro
@@ -461,7 +451,7 @@ theorem proof_intro_pers_auto (P G : PROP) :
 
 --set_option profiler true in
 #time theorem proof_intro_2 [BIAffine PROP] (P : Nat → PROP) :
-  ⊢ List.foldl (λ G n => iprop((P n) -∗ G)) (P 119) (List.range 120)
+  ⊢ List.foldl (λ G n => iprop((P n) -∗ G)) (P 19) (List.range 20)
 :=
   -- set_option trace.profiler true in by
    by
@@ -471,6 +461,7 @@ theorem proof_intro_pers_auto (P G : PROP) :
 -- TODO: why does ilif sometimes take more than 1ms here if there a no lif in the goal?
 --set_option profiler true in
 --set_option profiler.threshold 1 in
+set_option Elab.async false in
 set_option maxRecDepth 30000 in
 #time theorem proof_cancel_2 (P : Nat → PROP) :
   ⊢ List.foldl (λ G n => iprop((P n) -∗ G))

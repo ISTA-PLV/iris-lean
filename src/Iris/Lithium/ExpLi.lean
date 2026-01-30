@@ -79,7 +79,7 @@ theorem natL_inhale_nat v :
     return n := by
   dsimp [inhaleR, natL]
   intro E
-  iintro HP n Hn
+  iintro HP %n Hn
   mysorry
 
 @[irun]
@@ -102,7 +102,7 @@ theorem pairL_inhale_pair v :
     return (v1, v2) := by
   dsimp [inhaleR, pairL]
   intro E
-  iintro HP n Hn
+  iintro HP %n Hn
   mysorry
 
 @[irun]

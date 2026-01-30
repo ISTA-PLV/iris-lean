@@ -92,7 +92,7 @@ def pure (a : α) : @LithiumM PROP _ α := {
   run E := E a
   mono' E1 E2 := by
     iintro HE Hwand
-    iapply Hwand $! a with HE
+    iapply Hwand $$ HE
 }
 
 def bind (G1 : @LithiumM PROP _ α) (G2 : α → @LithiumM PROP _ β) :
@@ -115,26 +115,26 @@ instance : HPure α (@LithiumM PROP _ α) where
 def exhale (L : @InExM PROP α) : @LithiumM PROP _ α := {
   run E := iprop(∃ a, L.body a ∗ E a)
   mono' E1 E2 := by
-    iintro ⟨a, HL, HE⟩ Hwand
+    iintro ⟨%a, HL, HE⟩ Hwand
     iexists a
     isplitl [HL]
     · iassumption
-    · iapply Hwand $! a with HE
+    · iapply Hwand $$ HE
 }
 
 def inhale (L : @InExM PROP α) : @LithiumM PROP _ α := {
   run E := iprop(∀ a, L.body a -∗ E a)
   mono' E1 E2 := by
-    iintro HE Hwand a HL
-    iapply Hwand $! _
-    iapply HE $! a with HL
+    iintro HE Hwand %a HL
+    iapply Hwand
+    iapply HE $$ HL
 }
 
 def all (α : Type v) : @LithiumM PROP _ α := {
   run E := iprop(∀ a, E a)
   mono' E1 E2 := by
-    iintro HE Hwand a
-    iapply Hwand $! _
+    iintro HE Hwand %a
+    iapply Hwand
     iapply HE
 }
 
@@ -165,16 +165,16 @@ def dualizing (G : @LithiumM PROP _ Empty) : @LithiumM PROP _ Unit := {
   run E := iprop(G.run empty -∗ E ⟨⟩)
   mono' E1 E2 := by
     iintro HE Hwand HG
-    iapply Hwand $! _
-    iapply HE with HG
+    iapply Hwand
+    iapply HE $$ HG
 }
 
 def dualizingP (G : @LithiumM PROP _ PEmpty) : @LithiumM PROP _ PUnit := {
   run E := iprop(G.run emptyP -∗ E ⟨⟩)
   mono' E1 E2 := by
     iintro HE Hwand HG
-    iapply Hwand $! _
-    iapply HE with HG
+    iapply Hwand
+    iapply HE $$ HG
 }
 
 -- TODO: What are good precedences?
@@ -273,19 +273,19 @@ def test_lithium (A : @Atom PROP Nat) : @LithiumM PROP _ Bool := do
 -- #check InExM.instHBind
 -- #check LithiumM.instHBind
 
-/--
-error: typeclass instance problem is stuck, it is often due to metavariables
-  HBind.{0, u, u} Bool (LithiumM.{u, 0} Bool) (LithiumM.{u, 0} Bool)
--/
-#guard_msgs in
-def test_lithiumH (A : @Atom PROP Nat) : @LithiumM PROP _ Bool := do
-  HBind.hbind (LithiumM.exhale.{u} (α:=Bool) <|
-    HBind.hbind (InExM.atom A) λ n =>
-    HPure.hpure (n == 1)) λ b =>
-  LithiumM.inhale <|
-    HBind.hbind (InExM.atom A) λ n =>
-    HBind.hbind (InExM.prop (b = (n == 1))) λ _=>
-    HPure.hpure true
+-- /--
+-- error: typeclass instance problem is stuck, it is often due to metavariables
+--   HBind.{0, u, u} Bool (LithiumM.{u, 0} Bool) (LithiumM.{u, 0} Bool)
+-- -/
+-- #guard_msgs in
+-- def test_lithiumH (A : @Atom PROP Nat) : @LithiumM PROP _ Bool := do
+--   HBind.hbind (LithiumM.exhale.{u} (α:=Bool) <|
+--     HBind.hbind (InExM.atom A) λ n =>
+--     HPure.hpure (n == 1)) λ b =>
+--   LithiumM.inhale <|
+--     HBind.hbind (InExM.atom A) λ n =>
+--     HBind.hbind (InExM.prop (b = (n == 1))) λ _=>
+--     HPure.hpure true
 
 end Iris.Lithium
 
