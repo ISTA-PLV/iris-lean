@@ -90,7 +90,9 @@ def Li.bind (G1 : Li PROP α) (G2 : α → Li PROP β) :
   run E := G1.run (λ a => (G2 a).run E)
   mono' E1 E2 := by
     iintro HE Hwand
-    mysorry
+    iapply G1.mono' $$ HE
+    iintro %a HG2
+    iapply (G2 a).mono' $$ HG2, Hwand
 }
 
 instance : Monad (Li PROP) where
@@ -139,7 +141,11 @@ def cancel (P : PROP) (A : Atom PROP α) : Li PROP α := {
   run := cancelR P A
   mono' E1 E2 := by
     dsimp [cancelR]
-    mysorry
+    iintro Hwand HE HP
+    icases Hwand $$ HP with ⟨%a, HA, _⟩
+    iexists _
+    isplitl [HA]; iassumption
+    iapply HE; iassumption
 }
 
 def allR {α : Type v} (E : α → PROP) : PROP :=
@@ -184,8 +190,13 @@ def branchR (E1 E2 : PROP) : PROP :=
 def branch (G1 G2 : Li PROP α) : Li PROP α := {
   run E := branchR (G1.run E) (G2.run E)
   mono' E1 E2 := by
+    unfold branchR
     iintro HE Hwand
-    mysorry
+    isplit
+    · icases HE with ⟨HE, -⟩
+      iapply G1.mono' $$ HE, Hwand
+    · icases HE with ⟨-, HE⟩
+      iapply G2.mono' $$ HE, Hwand
 }
 
 def lifR (P : Prop) (E1 E2 : PROP) : PROP :=
@@ -195,8 +206,15 @@ def lifR (P : Prop) (E1 E2 : PROP) : PROP :=
 def lif (P : Prop) (G1 G2 : Li PROP α) : Li PROP α := {
   run E := lifR P (G1.run E) (G2.run E)
   mono' E1 E2 := by
+    unfold lifR
     iintro HE Hwand
-    mysorry
+    isplit <;> iintro H
+    · icases HE with ⟨HE, -⟩
+      iapply G1.mono' $$ [HE, H], Hwand
+      iapply HE $$ H
+    · icases HE with ⟨-, HE⟩
+      iapply G2.mono' $$ [HE, H], Hwand
+      iapply HE $$ H
 }
 
 def dropSpatialR (G : PROP) : PROP :=
@@ -206,7 +224,9 @@ def dropSpatialR (G : PROP) : PROP :=
 def dropSpatial (G : Li PROP α) : Li PROP α := {
   run E := dropSpatialR (G.run E)
   mono' E1 E2 := by
+    unfold dropSpatialR
     iintro HE Hwand
+    -- TODO: This is a problem, the wand is not persistent
     mysorry
 }
 
@@ -216,8 +236,9 @@ def simpR {α : Type _} [BI PROP] (_ : Lean.Name) (_dsimp : Bool) (a : α) (E : 
 def simp {α : Type _} [BI PROP] (n : Lean.Name) (dsimp : Bool) (a : α) : Li PROP α := {
   run := simpR n dsimp a
   mono' E1 E2 := by
-    simp [simpR]
-    mysorry
+    unfold simpR
+    iintro HE Hwand
+    iapply Hwand $$ HE
 }
 
 def dualizingR (G : (Empty → PROP) → PROP) (E : Unit → PROP) : PROP :=
