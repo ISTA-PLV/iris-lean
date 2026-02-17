@@ -422,7 +422,7 @@ def irunInhaleProp2 : IRunTacticType := fun goal _config => do profileitM Except
     -- TODO: iintros has this, what does this do?
     -- addLocalVarInfo ref (← getLCtx) x α
     let m ← mkFreshExprSyntheticOpaqueMVar <|
-        IrisGoalShallow.toExpr { u, prop, bi, hyp, goal := Expr.beta E #[mkConst ``Unit.unit]}
+        IrisGoalShallow.toExpr { u, prop, bi, hyp, goal := Expr.beta E #[mkConst ``Unit.unit] }
     let mbound ← mkLambdaFVars #[x] m
     let pf := mkApp6 (.const ``inhale_prop_tac [u]) prop bi φ hyp E mbound
     return (pf, m.mvarId!)
@@ -441,7 +441,7 @@ def irunInhaleProp : IRunTacticType := fun goal _config => do profileitM Excepti
     -- TODO: iintros has this, what does this do?
     -- addLocalVarInfo ref (← getLCtx) x α
     let m ← mkFreshExprSyntheticOpaqueMVar <|
-        IrisGoalShallow.toExpr { u, prop, bi, hyp, goal := Expr.beta E #[mkConst ``Unit.unit]}
+        IrisGoalShallow.toExpr { u, prop, bi, hyp, goal := Expr.beta E #[mkConst ``Unit.unit] }
     let mbound ← mkLambdaFVars #[x] m
     let pf := mkApp6 (.const ``inhale_prop_tac [u]) prop bi φ hyp E mbound
     return (pf, m.mvarId!)
@@ -664,7 +664,7 @@ def irunSimp : IRunTacticType := fun goal _config => do profileitM Exception "ir
   let dodsimp : Bool ← reduceEval dodsimp
   if dodsimp then
     let ⟨e_new, _⟩ ← dsimpWithExt n e
-    let g' := {ig with goal := Expr.beta E #[e_new]}.toExpr
+    let g' := {ig with goal := Expr.beta E #[e_new] }.toExpr
     let goal' ← mkFreshExprSyntheticOpaqueMVar g'
     let pf ← mkExpectedTypeHint goal' ig.toExpr
     return .some (pf, [goal'.mvarId!], [])

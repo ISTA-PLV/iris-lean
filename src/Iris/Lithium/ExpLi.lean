@@ -218,7 +218,7 @@ def irunSubst : IRunTacticType := fun goal _config => do profileitM Exception "i
   let some x := Reify.Binder.reify x | return none
   let e := Reify.reify e
   let e' := (Reify.subst' x v e).unreify
-  let g' := {ig with goal := Expr.beta E #[e']}.toExpr
+  let g' := {ig with goal := Expr.beta E #[e'] }.toExpr
   let goal' ← mkFreshExprSyntheticOpaqueMVar g'
   let pf ← mkExpectedTypeHint goal' ig.toExpr
   return .some (pf, [goal'.mvarId!], [])

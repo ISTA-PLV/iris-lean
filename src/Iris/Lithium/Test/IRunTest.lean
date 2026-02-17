@@ -128,7 +128,7 @@ def irunSimp : IRunTacticType := fun goal _config => do profileitM Exception "ir
   let e := G.getArg! 4
   let P := G.getArg! 5
   let ⟨e_new, _⟩ ← dsimpWithExt n e
-  let g' := {ig with goal := Expr.beta P #[e_new]}.toExpr
+  let g' := {ig with goal := Expr.beta P #[e_new] }.toExpr
   let goal' ← mkFreshExprSyntheticOpaqueMVar g'
   let pf ← mkExpectedTypeHint goal' ig.toExpr
   return .some (pf, [goal'.mvarId!], [])
@@ -284,7 +284,7 @@ def irunSubst : IRunTacticType := fun goal _config => do profileitM Exception "i
   let P := G.getArg! 4
   let e := Reify.reify (G.getArg! 3)
   let e' := (Reify.subst' x v e).unreify
-  let g' := {ig with goal := Expr.beta P #[e']}.toExpr
+  let g' := {ig with goal := Expr.beta P #[e'] }.toExpr
   let goal' ← mkFreshExprSyntheticOpaqueMVar g'
   let pf ← mkExpectedTypeHint goal' ig.toExpr
   return .some (pf, [goal'.mvarId!], [])
