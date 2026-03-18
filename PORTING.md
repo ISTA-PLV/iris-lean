@@ -40,10 +40,10 @@ Some porting tasks will require other tasks as dependencies, the GitHub issues p
   - [x] coPset definition
   - [ ] CMRA
 - [x] `cofe_solver.v` 
-- [ ] `csum.v`
-  - [ ] CMRA
-  - [ ] Updates
-  - [ ] Functors
+- [x] `csum.v`
+  - [x] CMRA
+  - [x] Updates
+  - [x] Functors
 - [ ] `dfrac.v`
   - [x] CMRA
   - [x] Updates
@@ -119,9 +119,9 @@ Some porting tasks will require other tasks as dependencies, the GitHub issues p
   - [x] CMRA
   - [x] Updates
   - [x] Functors
-- [ ] `lib/dfrac_agree.v` 
-  - [ ] Lemmas
-  - [ ] Updates
+- [x] `lib/dfrac_agree.v` 
+  - [x] Lemmas
+  - [x] Updates
 - [x] `lib/excl_auth.v` 
   - [x] Lemmas
   - [x] Updates
