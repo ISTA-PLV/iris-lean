@@ -117,6 +117,7 @@ class Sequential {GF : BundledGFunctors} {E : Effect} (H : iHandler GF E) where
     ⊢ H.ihandle i Φ s -∗ H.ihandle i Φ (fun _ => iprop(⌜False⌝))
 
 -- TODO: `iapply` does not work, needed to find the reason
+set_option pp.all true in
 instance sumH_Sequential {GF E₁ E₂} (H1 : iHandler GF E₁) (H2 : iHandler GF E₂)
   [Hs1 : Sequential H1] [Hs2 : Sequential H2] : Sequential (H1 ⊕ₕ H2) := by
     refine ⟨?_⟩
@@ -124,9 +125,9 @@ instance sumH_Sequential {GF E₁ E₂} (H1 : iHandler GF E₁) (H2 : iHandler G
     cases e with
     | inl e1 =>
         simp [sumH] at *
-        -- iapply Hs1.is_seq $$ H
-        sorry
+        ihave H' := Hs1.is_seq $$ H
+        iexact H'
     | inr e2 =>
         simp [sumH] at *
-        -- iapply Hs2.is_seq $$ H
-        sorry
+        ihave H' := Hs2.is_seq $$ H
+        iexact H'
