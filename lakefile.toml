@@ -20,5 +20,10 @@ path = "../coinductive"
 name = "Iris"
 
 [[lean_lib]]
+name = "Carte"
+srcDir = "."
+globs = ["Carte.*"]
+
+[[lean_lib]]
 name = "IrisTest"
 globs = ["Iris.*"]

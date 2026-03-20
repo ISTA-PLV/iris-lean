@@ -14,15 +14,12 @@ open Lean Elab Tactic Meta Qq BI Std
 
 elab "iexact" colGt hyp:ident : tactic => do
   ProofModeM.runTactic λ mvar { hyps, goal, .. } => do
-    let uniq ← hyps.findWithInfo hyp
-    let ⟨e', _, _, out, p, _, pf⟩ := hyps.remove true uniq
+  let uniq ← hyps.findWithInfo hyp
+  let ⟨e', _, _, out, p, _, pf⟩ := hyps.remove true uniq
 
-    let .some _ ← trySynthInstanceQ q(TCOr (Affine $e') (Absorbing $goal))
-      | throwError "iexact: context is not affine or goal is not absorbing"
+  let some _ ← ProofModeM.trySynthInstanceQ q(FromAssumption $p .in $out $goal)
+    | throwError "iexact: cannot unify {out} and {goal}"
+  let .some _ ← trySynthInstanceQ q(TCOr (Affine $e') (Absorbing $goal))
+    | throwError "iexact: context is not affine or goal is not absorbing"
 
-    if let .defEq _ ← isDefEqQ out goal then
-      mvar.assign q($pf.1.trans <| (sep_mono_r intuitionisticallyIf_elim).trans sep_elim_r)
-    else
-      let some _ ← ProofModeM.trySynthInstanceQ q(FromAssumption $p .in $out $goal)
-        | throwError "iexact: cannot unify {out} and {goal}"
-      mvar.assign q(assumption (Q := $goal) $pf)
+  mvar.assign q(assumption (Q := $goal) $pf)
