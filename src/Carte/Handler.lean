@@ -9,18 +9,18 @@ open Iris BI ITree
   weakest precondition [WPi]. It specifies how to interpret an event
   logically, given weakest preconditions for continuations of the itree.
 -/
-structure IHandler GF (E : Effect.{u}) where
+structure IHandler {PROP} [BI PROP] (E : Effect.{u}) where
   ihandle :
       (i : E.I) →
       -- Continuation conditions [λ a, ▷ WPi k a @ H; ∅ {{ Φ }}]
-      (E.O i → IProp GF) →
+      (E.O i → PROP) →
       -- Conditions for spawning threads [λ a, ▷ WPi k a @ H; ⊤ {{ False }}]
-      (E.O i → IProp GF) →
+      (E.O i → PROP) →
       -- Condition [WPi (Vis i k) @ H; ∅ {{ Φ }}]
-      IProp GF
+      PROP
 
   ihandle_mono :
-    ∀ (i : E.I) (Φ Φ' s s' : E.O i → IProp GF),
+    ∀ (i : E.I) (Φ Φ' s s' : E.O i → PROP),
       (∀ a, Φ a -∗ Φ' a) ⊢
       □ (∀ t, s t -∗ s' t) -∗
       ihandle i Φ s -∗ ihandle i Φ' s'
@@ -37,8 +37,15 @@ structure IHandler GF (E : Effect.{u}) where
 --   - rewrite !Hmon. repeat f_equiv.
 -- Qed.
 
+section handler_op
+variable {PROP : Type _} [BI PROP]
+
+abbrev Handler (E : Effect.{u}) := IHandler (PROP := PROP) E
+
 -- An [IHandler] for sum events [E₁ ⊕ₑ E₂] delegating to respective [IHandler]s.
-def sumH {GF E₁ E₂} (H1 : IHandler GF E₁) (H2 : IHandler GF E₂) : IHandler GF (E₁ ⊕ₑ E₂) where
+def sumH {PROP E₁ E₂} [BI PROP]
+    (H1 : IHandler (PROP := PROP) E₁) (H2 : IHandler (PROP := PROP) E₂) :
+    IHandler (PROP := PROP) (E₁ ⊕ₑ E₂) where
   ihandle := by
     intro e Φ s
     cases e with
@@ -51,31 +58,36 @@ def sumH {GF E₁ E₂} (H1 : IHandler GF E₁) (H2 : IHandler GF E₂) : IHandl
     | inr e2 => simp at Φ Φ' s s' ⊢; iapply H2.ihandle_mono $$ HΦwand, Hswand, HH
 infixr:30 " ⊕ₕ " => sumH
 
-@[simp] theorem sumH_ihandle_inl {GF E₁ E₂} (H1 : IHandler GF E₁) (H2 : IHandler GF E₂) (i : E₁.I) (Φ s) :
+@[simp] theorem sumH_ihandle_inl {PROP E₁ E₂} [BI PROP]
+    (H1 : IHandler (PROP := PROP) E₁) (H2 : IHandler (PROP := PROP) E₂) (i : E₁.I) (Φ s) :
   (H1 ⊕ₕ H2).ihandle (.inl i) Φ s = H1.ihandle i Φ s := rfl
 
-@[simp] theorem sumH_ihandle_inr {GF E₁ E₂} (H1 : IHandler GF E₁) (H2 : IHandler GF E₂) (i : E₂.I) (Φ s) :
+@[simp] theorem sumH_ihandle_inr {PROP E₁ E₂} [BI PROP]
+    (H1 : IHandler (PROP := PROP) E₁) (H2 : IHandler (PROP := PROP) E₂) (i : E₂.I) (Φ s) :
   (H1 ⊕ₕ H2).ihandle (.inr i) Φ s = H2.ihandle i Φ s := rfl
 
 /- `InH H1 H2` means that, on events [E1], [H1] is equivalent to [H2] -/
-class InH {GF E₁ E₂} [Hsub : E₁ -< E₂] (H1 : IHandler GF E₁) (H2 : IHandler GF E₂) where
-  is_inH : ∀ (i₁ : E₁.I) (Φ₁ s₁ : E₁.O i₁ → IProp GF),
+class InH {PROP E₁ E₂} [BI PROP] [Hsub : E₁ -< E₂]
+    (H1 : IHandler (PROP := PROP) E₁) (H2 : IHandler (PROP := PROP) E₂) where
+  is_inH : ∀ (i₁ : E₁.I) (Φ₁ s₁ : E₁.O i₁ → PROP),
     let ⟨i₂, f⟩ := Hsub.map i₁
     let Φ₂ := fun x => Φ₁ <| f x
     let s₂ := fun x => s₁ <| f x
     H1.ihandle i₁ Φ₁ s₁ ⊣⊢ H2.ihandle i₂ Φ₂ s₂
 
-instance {GF E} (H : IHandler GF E) : InH H H := by
+instance {PROP E} [BI PROP] (H : IHandler (PROP := PROP) E) : InH H H := by
   constructor; intro i Φ s; simp
 
-instance {GF E₁ E₂ E₃} [f : E₁ -< E₂] (H1 : IHandler GF E₁) (H2 : IHandler GF E₂) (H3 : IHandler GF E₃) :
+instance {PROP E₁ E₂ E₃} [BI PROP] [f : E₁ -< E₂]
+    (H1 : IHandler (PROP := PROP) E₁) (H2 : IHandler (PROP := PROP) E₂) (H3 : IHandler (PROP := PROP) E₃) :
   InH H1 H2 → InH H1 (H2 ⊕ₕ H3) := by
     intro Hin
     constructor
     intro i Φ s
     exact Hin.is_inH i Φ s
 
-instance {GF E₁ E₂ E₃} [f : E₁ -< E₃] (H1 : IHandler GF E₁) (H2 : IHandler GF E₂) (H3 : IHandler GF E₃) :
+instance {PROP E₁ E₂ E₃} [BI PROP] [f : E₁ -< E₃]
+    (H1 : IHandler (PROP := PROP) E₁) (H2 : IHandler (PROP := PROP) E₂) (H3 : IHandler (PROP := PROP) E₃) :
   InH H1 H3 → InH H1 (H2 ⊕ₕ H3) := by
     intro Hin
     constructor
@@ -83,16 +95,17 @@ instance {GF E₁ E₂ E₃} [f : E₁ -< E₃] (H1 : IHandler GF E₁) (H2 : IH
     exact Hin.is_inH i Φ s
 
 /- `[WandH H1 H2]` means that `H1` implies `H2` -/
-class WandH {GF E} (H1 : IHandler GF E) (H2 : IHandler GF E) where
-  is_wandH : ∀ (i : E.I) (Φ s : E.O i → IProp GF),
+class WandH {PROP E} [BI PROP] (H1 : IHandler (PROP := PROP) E) (H2 : IHandler (PROP := PROP) E) where
+  is_wandH : ∀ (i : E.I) (Φ s : E.O i → PROP),
     ⊢ H1.ihandle i Φ s -∗ H2.ihandle i Φ s
 
-instance {GF E} (H : IHandler GF E) : WandH H H := by
+instance {PROP E} [BI PROP] (H : IHandler (PROP := PROP) E) : WandH H H := by
   constructor
   iintro %i %Φ %s H
   iexact H
 
-instance {GF E₁ E₂} (H1 H1' : IHandler GF E₁) (H2 H2' : IHandler GF E₂) :
+instance {PROP E₁ E₂} [BI PROP]
+    (H1 H1' : IHandler (PROP := PROP) E₁) (H2 H2' : IHandler (PROP := PROP) E₂) :
   WandH H1 H1' → WandH H2 H2' → WandH (H1 ⊕ₕ H2) (H1' ⊕ₕ H2') := by
     intro Hwand1 Hwand2
     constructor
@@ -102,14 +115,17 @@ instance {GF E₁ E₂} (H1 H1' : IHandler GF E₁) (H2 H2' : IHandler GF E₂) 
     | inr e2 => simp_all; iapply Hwand2.is_wandH $$ H
 
 /- `Sequential` handlers ignore the spawning continuation and do not model concurrency. -/
-class Sequential {GF : BundledGFunctors} {E : Effect} (H : IHandler GF E) where
-  is_seq : ∀ (i : E.I) (Φ s : E.O i → IProp GF),
+class Sequential {PROP} [BI PROP] {E : Effect} (H : IHandler (PROP := PROP) E) where
+  is_seq : ∀ (i : E.I) (Φ s : E.O i → PROP),
     ⊢ H.ihandle i Φ s -∗ H.ihandle i Φ (fun _ => iprop(⌜False⌝))
 
-instance {GF E₁ E₂} (H1 : IHandler GF E₁) (H2 : IHandler GF E₂)
+instance {PROP E₁ E₂} [BI PROP]
+  (H1 : IHandler (PROP := PROP) E₁) (H2 : IHandler (PROP := PROP) E₂)
   [Hs1 : Sequential H1] [Hs2 : Sequential H2] : Sequential (H1 ⊕ₕ H2) := by
     refine ⟨?_⟩
     iintro %e %Φ %s H
     cases e with
     | inl e1 => simp_all; iapply Hs1.is_seq $$ H
     | inr e2 => simp_all; iapply Hs2.is_seq $$ H
+
+end handler_op
