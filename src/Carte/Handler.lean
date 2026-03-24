@@ -25,17 +25,6 @@ structure IHandler {PROP} [BI PROP] (E : Effect.{u}) where
       □ (∀ t, s t -∗ s' t) -∗
       ihandle i Φ s -∗ ihandle i Φ' s'
 
--- TODO: define pointwise_relation
--- Global Instance handler_ne Σ E n (H : IHandler Σ E) A :
---   Proper (pointwise_relation _ (pointwise_relation _ (dist n) ==> pointwise_relation _ (dist n) ==> dist n)) (ihandle _ _ H A).
--- Proof.
---   intros e Φ1 Φ2 HΦ s1 s2 Hs.
---   assert (Hmon : ∀ Φ s, (H A e Φ s ⊣⊢ ∃ Φ' s', (∀ a, Φ' a -∗ Φ a) ∗ □ (∀ a, s' a -∗ s a) ∗ H A e Φ' s')).
---   - iIntros (Φ s). iSplit.
---     * iIntros "HH". iExists Φ, s. iSplitR; first eauto. by iSplitR; first eauto.
---     * iIntros "[%Φ' [%s' [HmonΦ [Hmons HH]]]]". by iApply (IHandler_mono with "HmonΦ Hmons").
---   - rewrite !Hmon. repeat f_equiv.
--- Qed.
 instance {PROP E} [BI PROP] (H : IHandler (PROP := PROP) E) (i : E.I) :
     OFE.NonExpansive₂ (H.ihandle i) := by
   constructor
@@ -45,48 +34,45 @@ instance {PROP E} [BI PROP] (H : IHandler (PROP := PROP) E) (i : E.I) :
     . iintro Hwand; iexists Φ, s; isplitr;
       . iintro %a H; iexact H
       . isplitr; imodintro; iintro %a H; iexact H; iexact Hwand
-    . iintro H;
-      -- TODO: option1: iintro destruct, option2: idestruct tactic
-      sorry
-  refine (Hmon Φ₁ s₁).dist.trans ?_
-  refine ((exists_ne fun Φ' => ?_)).trans (Hmon Φ₂ s₂).dist.symm
+    . iintro ⟨%Φ', ⟨%s', ⟨HmonΦ, ⟨Hmons, HH⟩⟩⟩⟩
+      iapply H.ihandle_mono $$ HmonΦ, Hmons, HH
+  apply (Hmon Φ₁ s₁).dist.trans
+  apply ((exists_ne fun Φ' => ?_)).trans (Hmon Φ₂ s₂).dist.symm
   refine exists_ne fun s' => ?_
   refine sep_ne.ne ?_ <| sep_ne.ne ?_ .rfl
-  · refine forall_ne fun a => ?_
-    exact wand_ne.ne .rfl (HΦ a)
-  · refine intuitionistically_ne.ne ?_
-    refine forall_ne fun a => ?_
-    exact wand_ne.ne .rfl (Hs a)
+  · apply forall_ne; intro a; exact wand_ne.ne .rfl (HΦ a)
+  · apply intuitionistically_ne.ne; apply forall_ne; intro a; exact wand_ne.ne .rfl (Hs a)
 
-section handler_op
-variable {PROP : Type _} [BI PROP]
+section handler_sumH
+
+variable {E₁ E₂} {PROP : Type _} [BI PROP] (H₁ : IHandler (PROP := PROP) E₁) (H₂ : IHandler (PROP := PROP) E₂)
 
 -- An [IHandler] for sum events [E₁ ⊕ₑ E₂] delegating to respective [IHandler]s.
-def sumH {PROP E₁ E₂} [BI PROP]
-    (H1 : IHandler (PROP := PROP) E₁) (H2 : IHandler (PROP := PROP) E₂) :
-    IHandler (PROP := PROP) (E₁ ⊕ₑ E₂) where
+def sumH : IHandler (PROP := PROP) (E₁ ⊕ₑ E₂) where
   ihandle := by
     intro e Φ s
     cases e with
-    | inl e1 => exact H1.ihandle e1 Φ s
-    | inr e2 => exact H2.ihandle e2 Φ s
+    | inl e1 => exact H₁.ihandle e1 Φ s
+    | inr e2 => exact H₂.ihandle e2 Φ s
   ihandle_mono := by
     iintro %e %Φ %Φ' %s %s' HΦwand #Hswand HH
     cases e with
-    | inl e1 => simp at Φ Φ' s s' ⊢; iapply H1.ihandle_mono $$ HΦwand, Hswand, HH
-    | inr e2 => simp at Φ Φ' s s' ⊢; iapply H2.ihandle_mono $$ HΦwand, Hswand, HH
+    | inl e1 => simp at Φ Φ' s s' ⊢; iapply H₁.ihandle_mono $$ HΦwand, Hswand, HH
+    | inr e2 => simp at Φ Φ' s s' ⊢; iapply H₂.ihandle_mono $$ HΦwand, Hswand, HH
 infixr:30 " ⊕ₕ " => sumH
 
-@[simp] theorem sumH_ihandle_inl {PROP E₁ E₂} [BI PROP]
-    (H1 : IHandler (PROP := PROP) E₁) (H2 : IHandler (PROP := PROP) E₂) (i : E₁.I) (Φ s) :
-  (H1 ⊕ₕ H2).ihandle (.inl i) Φ s = H1.ihandle i Φ s := rfl
+theorem sumH_ihandle_inl (i : E₁.I) (Φ s) : (H₁ ⊕ₕ H₂).ihandle (.inl i) Φ s = H₁.ihandle i Φ s := rfl
 
-@[simp] theorem sumH_ihandle_inr {PROP E₁ E₂} [BI PROP]
-    (H1 : IHandler (PROP := PROP) E₁) (H2 : IHandler (PROP := PROP) E₂) (i : E₂.I) (Φ s) :
-  (H1 ⊕ₕ H2).ihandle (.inr i) Φ s = H2.ihandle i Φ s := rfl
+theorem sumH_ihandle_inr (i : E₂.I) (Φ s) : (H₁ ⊕ₕ H₂).ihandle (.inr i) Φ s = H₂.ihandle i Φ s := rfl
+
+end handler_sumH
+
+section handler_InH
+
+variable {PROP : Type _} [BI PROP]
 
 /- `InH H1 H2` means that, on events [E1], [H1] is equivalent to [H2] -/
-class InH {PROP E₁ E₂} [BI PROP] [Hsub : E₁ -< E₂]
+class InH {E₁ E₂} [Hsub : E₁ -< E₂]
     (H1 : IHandler (PROP := PROP) E₁) (H2 : IHandler (PROP := PROP) E₂) where
   is_inH : ∀ (i₁ : E₁.I) (Φ₁ s₁ : E₁.O i₁ → PROP),
     let ⟨i₂, f⟩ := Hsub.map i₁
@@ -113,6 +99,10 @@ instance {PROP E₁ E₂ E₃} [BI PROP] [f : E₁ -< E₃]
     intro i Φ s
     exact Hin.is_inH i Φ s
 
+end handler_InH
+
+section handler_WandH
+
 /- `[WandH H1 H2]` means that `H1` implies `H2` -/
 class WandH {PROP E} [BI PROP] (H1 : IHandler (PROP := PROP) E) (H2 : IHandler (PROP := PROP) E) where
   is_wandH : ∀ (i : E.I) (Φ s : E.O i → PROP),
@@ -130,8 +120,12 @@ instance {PROP E₁ E₂} [BI PROP]
     constructor
     iintro %e %Φ %s H
     cases e with
-    | inl e1 => simp_all; iapply Hwand1.is_wandH $$ H
-    | inr e2 => simp_all; iapply Hwand2.is_wandH $$ H
+    | inl e1 => simp [sumH]; iapply Hwand1.is_wandH $$ H
+    | inr e2 => simp [sumH]; iapply Hwand2.is_wandH $$ H
+
+end handler_WandH
+
+section handler_Sequential
 
 /- `Sequential` handlers ignore the spawning continuation and do not model concurrency. -/
 class Sequential {PROP} [BI PROP] {E : Effect} (H : IHandler (PROP := PROP) E) where
@@ -144,7 +138,7 @@ instance {PROP E₁ E₂} [BI PROP]
     refine ⟨?_⟩
     iintro %e %Φ %s H
     cases e with
-    | inl e1 => simp only [sumH_ihandle_inl, sumE_O_inl] ; iapply Hs1.is_seq $$ H
-    | inr e2 => simp_all; iapply Hs2.is_seq $$ H
+    | inl e1 => simp [sumH_ihandle_inl, sumE_O_inl]; iapply Hs1.is_seq $$ H
+    | inr e2 => simp [sumH_ihandle_inr, sumE_O_inr]; iapply Hs2.is_seq $$ H
 
-end handler_op
+end handler_Sequential
