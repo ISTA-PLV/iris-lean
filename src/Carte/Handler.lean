@@ -36,11 +36,30 @@ structure IHandler {PROP} [BI PROP] (E : Effect.{u}) where
 --     * iIntros "[%Φ' [%s' [HmonΦ [Hmons HH]]]]". by iApply (IHandler_mono with "HmonΦ Hmons").
 --   - rewrite !Hmon. repeat f_equiv.
 -- Qed.
+instance {PROP E} [BI PROP] (H : IHandler (PROP := PROP) E) (i : E.I) :
+    OFE.NonExpansive₂ (H.ihandle i) := by
+  constructor
+  intro n Φ₁ Φ₂ HΦ s₁ s₂ Hs
+  have Hmon : ∀ Φ s, H.ihandle i Φ s ≡ iprop(∃ Φ' s', (∀ a, Φ' a -∗ Φ a) ∗ □ (∀ a, s' a -∗ s a) ∗ H.ihandle i Φ' s') := by
+    iintro %Φ %s; isplit
+    . iintro Hwand; iexists Φ, s; isplitr;
+      . iintro %a H; iexact H
+      . isplitr; imodintro; iintro %a H; iexact H; iexact Hwand
+    . iintro H;
+      -- TODO: option1: iintro destruct, option2: idestruct tactic
+      sorry
+  refine (Hmon Φ₁ s₁).dist.trans ?_
+  refine ((exists_ne fun Φ' => ?_)).trans (Hmon Φ₂ s₂).dist.symm
+  refine exists_ne fun s' => ?_
+  refine sep_ne.ne ?_ <| sep_ne.ne ?_ .rfl
+  · refine forall_ne fun a => ?_
+    exact wand_ne.ne .rfl (HΦ a)
+  · refine intuitionistically_ne.ne ?_
+    refine forall_ne fun a => ?_
+    exact wand_ne.ne .rfl (Hs a)
 
 section handler_op
 variable {PROP : Type _} [BI PROP]
-
-abbrev Handler (E : Effect.{u}) := IHandler (PROP := PROP) E
 
 -- An [IHandler] for sum events [E₁ ⊕ₑ E₂] delegating to respective [IHandler]s.
 def sumH {PROP E₁ E₂} [BI PROP]
@@ -125,7 +144,7 @@ instance {PROP E₁ E₂} [BI PROP]
     refine ⟨?_⟩
     iintro %e %Φ %s H
     cases e with
-    | inl e1 => simp_all; iapply Hs1.is_seq $$ H
+    | inl e1 => simp only [sumH_ihandle_inl, sumE_O_inl] ; iapply Hs1.is_seq $$ H
     | inr e2 => simp_all; iapply Hs2.is_seq $$ H
 
 end handler_op
