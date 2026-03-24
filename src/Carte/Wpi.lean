@@ -6,7 +6,7 @@ import ITree.Effect
 
 open Iris BI ITree
 
-section wp_itree
+section wp_itree_def
 
 variable {E} {PROP : Type _} [BI PROP] [BIUpdate PROP] (H : IHandler (PROP := PROP) E)
 
@@ -30,23 +30,25 @@ def wpiF' {R} (wpi : LeibnizO (ITree E R) × (R → PROP) → PROP) :
   fun ⟨t, Φ⟩ => wpiF H (fun t Φ => wpi (⟨t⟩, Φ)) t.car Φ
 
 /-- Helper function for proving BIMonoPred -/
-instance {R} : OFE (LeibnizO (ITree E R) × (R → PROP) → PROP) := by
-  infer_instance
-
--- set_option trace.Meta.synthInstance true in
--- instance {R} : OFE.NonExpansive (wpiF' H) where
---   ne {n wp1 wp2} Hwp x := by
---     sorry
-
+instance wpiF'_ne {R} : OFE.NonExpansive (wpiF' H (R := R)) := by
+  constructor
+  intro n wp1 wp2 Hwp ⟨t, Φ⟩
+  cases h : t.car.unfold <;> simp [wpiF', wpiF, h]
+  case tau t' => exact BIUpdate.bupd_ne.ne <| Hwp (⟨t'⟩, Φ)
+  case vis i k =>
+    apply BIUpdate.bupd_ne.ne
+    apply OFE.NonExpansive₂.ne (f := H.ihandle i)
+    · intro a; apply Hwp (⟨k a⟩, Φ)
+    · intro a; apply BIUpdate.bupd_ne.ne <| Hwp (⟨k a⟩, fun _ => iprop(False))
 
 theorem wpiF_mono {R} (wp1 wp2 : ITree E R → (R → PROP) → PROP) :
     ⊢ □ (∀ t Φ, wp1 t Φ -∗ wp2 t Φ) -∗
       ∀ t Φ, wpiF H wp1 t Φ -∗ wpiF H wp2 t Φ := by
   iintro □Hwand %t %Φ Hwp
   unfold wpiF
-  cases t.unfold <;> simp only
+  cases t.unfold <;> simp
   case ret => iexact Hwp
-  case tau t' => imod Hwp; imodintro; irevert Hwp; iexact Hwand
+  case tau t' => imod Hwp; imodintro; iapply Hwand $$ Hwp
   case vis i k =>
     imod Hwp; imodintro; iapply H.ihandle_mono
     · iintro %a Hk; iapply Hwand $$ Hk
@@ -63,7 +65,6 @@ theorem wpiF'_mono {R} (wp1 wp2 : LeibnizO (ITree E R) × (R → PROP) → PROP)
     iapply wpiF_mono (wp1 := fun t Φ => wp1 ({ car := t }, Φ)) (wp2 := fun t Φ => wp2 ({ car := t }, Φ))
     . iintro !> %t' %Φ' Hw; iapply Hwand $$ %⟨t'⟩, %Φ', Hw
     . iexact Hwp
-
 /-- End of Helper -/
 
 instance {R} : BIMonoPred (λ wp_itree : LeibnizO (ITree E R) × (R → PROP) → PROP => wpiF' H wp_itree) where
@@ -73,26 +74,27 @@ instance {R} : BIMonoPred (λ wp_itree : LeibnizO (ITree E R) × (R → PROP) �
     . iintro !> %t %Φ1; iapply H
     . iexact Hsim
   mono_pred_ne := by
-    intros Φ HΦ
-    -- unfold OFE.NonExpansive
-    sorry
+    intro wp Hwp; constructor; intro n ⟨t1, Ψ1⟩ ⟨t2, Ψ2⟩ ⟨Ht, HΨ⟩
+    simp at Ht HΨ; subst Ht
+    cases h : t1.car.unfold <;> simp [wpiF', wpiF, h]
+    case ret r => exact BIUpdate.bupd_ne.ne (HΨ r)
+    case tau t' => exact BIUpdate.bupd_ne.ne <| Hwp.ne ⟨rfl, HΨ⟩
+    case vis i k =>
+      apply BIUpdate.bupd_ne.ne
+      apply OFE.NonExpansive₂.ne (f := H.ihandle i)
+      · intro a; exact Hwp.ne ⟨rfl, HΨ⟩
+      · intro a; apply BIUpdate.bupd_ne.ne <| Hwp.ne ⟨rfl, fun _ => .rfl⟩
 
+/-- The weakest precondition is defined as the least fixpoint of [wpiF']. -/
 def wpi {E R} (H : IHandler (PROP := PROP) E) (t : ITree E R) (Φ : R → PROP) : PROP :=
   bi_least_fixpoint (wpiF' H) (⟨t⟩, Φ)
 
--- set_option trace.Meta.synthInstance true in
--- theorem wpiF_ne {E R n} (H : IHandler (PROP := PROP) E)
---     (wp1 wp2 : ITree E R → (R → PROP) → PROP) :
---     ∀ t1 t2 (Φ1 Φ2 : R → PROP), t1 ≡{n}≡ t2 → Φ1 ≡{n}≡ Φ2 → wpiF H wp1 t1 ≡{n}≡ wpiF H wp2 t2 := by
---   intros t1 t2 Φ1 Φ2 Ht HΦ
---   subst Ht
---   unfold wpiF at ⊢
---   apply OFE.NonExpansive.ne (f := BUpd.bupd (PROP := PROP))
+/-- Unfolding [wpi] reveals one step of the weakest precondition functional. -/
+theorem wpi_unfold_mask {R} (t : ITree E R) Φ : wpi H t Φ ⊣⊢ wpiF H (wpi H) t Φ := by
+  apply equiv_iff.mp
+  apply least_fixpoint_unfold
 
---   iintro
--- set_option pp.all true in
+end wp_itree_def
 
--- theorem wpi_unfold_mask H (t : ITree E R) Φ : wpi H t Φ ⊣⊢ wpiF H (wpi H) t Φ := by
---   sorry
-
-end wp_itree
+macro:20 "WPi " t:term:20 " @ " H:term:20 " {{ " Φ:term:20 " }}" : term => `(wpi $H $t $Φ)
+macro:20 "WPi " t:term:20 " @ " H:term:20 " {{ " v:ident " , " Q:term:20 " }}" : term => `(wpi $H $t (fun $v => $Q))
