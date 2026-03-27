@@ -333,7 +333,7 @@ theorem wpi_frame_l_emp_mask (P : PROP) :
       (WPi t @> H {{ v, iprop(P ∗ Φ v) }}) := by
   iintro ⟨Hp, Hwp⟩
   iapply wpi_wand_emp_mask H t Φ $$ [Hp]
-  . iintro %r Hr; sorry -- TODO: use [iframe];
+  . iintro %r Hr; isplitl [Hp]; iexact Hp; iexact Hr
   . iexact Hwp
 
 theorem wpi_frame_r_emp_mask (P : PROP) :
@@ -341,7 +341,7 @@ theorem wpi_frame_r_emp_mask (P : PROP) :
       (WPi t @> H {{ v, iprop(Φ v ∗ P) }}) := by
   iintro ⟨Hwp, Hp⟩
   iapply wpi_wand_emp_mask H t Φ $$ [Hp]
-  . iintro %r Hr; sorry -- TODO: use [iframe]
+  . iintro %r Hr; isplitl [Hr]; iexact Hr; iexact Hp
   . iexact Hwp
 
 end wp_itree_structural
