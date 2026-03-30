@@ -110,41 +110,188 @@ theorem wpi_iter' : (∀ t, OFE.NonExpansive (G t)) →
 
 end wp_itree_induction
 
--- Structural rules for WPi (mask version)
-section wp_itree_induction
+section wp_itree_derived
 
-variable {E R} {H : IHandler (PROP := PROP) E} (G : ITree E R → (R → PROP) → PROP)
+open ITree BIUpdate OFE
 
-theorem wpi_wand (t : ITree E R) (M : CoPset) Φ Ψ :
+variable {E R} {H : IHandler (PROP := PROP) E} (t : ITree E R)
+
+theorem wpi_wand (M : CoPset) (Φ Ψ : R → PROP) :
     ⊢ (∀ r, iprop(Φ r -∗ Ψ r)) -∗
-      (WPi t @> H;M {{ Φ }}) -∗
-      (WPi t @> H;M {{ Ψ }}) := by
-  iintro Hwand Hwp;
-  -- TODO: Unprovable
+      (WPi t @> H; M {{ Φ }}) -∗
+      (WPi t @> H; M {{ Ψ }}) := by
+  iintro Hwand Hwp
+  -- Lost Coq step: the original proof rewrites `wpi_mask` and uses `iMod`
+  -- through fancy updates under mask `M`. The current Lean proof mode
+  -- does not yet support that.
   sorry
 
-theorem wpi_bind (t : ITree E A) (k : A → ITree E R) M Φ:
-    (WPi t @> H; M {{ r, WPi (k r) @> H; M {{ Φ }} }}) ⊢
-    (WPi (t >>= k) @> H; M {{ Φ }}) := by
-  iintro Hwp;
-  -- TODO: Unprovable, waiting for imod support Fancy update
+theorem wpi_bind {A} (t : ITree E A) (k : A → ITree E R) (M : CoPset) (Φ : R → PROP) :
+    ⊢ (WPi t @> H; M {{ r, WPi (k r) @> H; M {{ Φ }} }}) -∗
+      (WPi (t >>= k) @> H; M {{ Φ }}) := by
+  iintro Hwp
+  -- Lost Coq step: the original proof uses `iMod`/`iModIntro` with fancy
+  -- updates while following the `wpi_bind_emp_mask` argument.
   sorry
 
-theorem wpi_fupd M Φ (t : ITree E R) :
+theorem fupd_wpi (M : CoPset) (Φ : R → PROP) :
     (|={M}=> WPi t @> H; M {{ Φ }}) ⊣⊢
     (WPi t @> H; M {{ Φ }}) := by
   isplit
-  . iintro Hwp
-    unfold wpi_mask
-    -- TODO: imod Hwp
+  · iintro Hwp
+    -- Lost Coq step: need to eliminate a fancy update in front of `wpi_mask`.
     sorry
-  . iintro Hwp
-    -- TODO: imodintro
+  · iintro Hwp
+    -- Lost Coq step: need to re-introduce a fancy update around `wpi_mask`.
     sorry
 
-theorem wpi_fupd_post M Φ (t : ITree E R) :
+theorem wpi_fupd (M : CoPset) (Φ : R → PROP) :
     (WPi t @> H; M {{ v, iprop(|={M}=> Φ v) }}) ⊣⊢
     (WPi t @> H; M {{ Φ }}) := by
+  isplit <;> iintro Hwp
+  · iapply wpi_wand t M <| fun v => iprop(|={M}=> Φ v)
+    · iintro %r HΦ
+      -- Lost Coq step: collapse `|={M}=> |={M}=> Φ r` to `|={M}=> Φ r`.
+      sorry
+    · iexact Hwp
+  · iapply wpi_wand t M Φ <| fun v => iprop(|={M}=> Φ v)
+    · iintro %r HΦ
+      -- Lost Coq step: introduce `|={M}=>` around `Φ r`.
+      sorry
+    · iexact Hwp
+
+end wp_itree_derived
+
+section wp_itree_mask_manipulation
+
+open ITree BIUpdate OFE
+
+variable {E R} {H : IHandler (PROP := PROP) E}
+
+theorem wpi_shift_mask (M' M : CoPset) (Φ : R → PROP) (t : ITree E R) :
+    ⊢ (|={M, M'}=> WPi t @> H; M' {{ v, iprop(|={M', M}=> Φ v) }}) -∗
+      (WPi t @> H; M {{ Φ }}) := by
+  iintro Hwp
+  -- Lost Coq step: the original proof performs two consecutive `iMod`
+  -- eliminations on fancy updates before applying `wpi_wand_emp_mask`.
   sorry
 
-end wp_itree_induction
+theorem wpi_empty_mask (M : CoPset) (Φ : R → PROP) (t : ITree E R) :
+    (|={M, ∅}=> WPi t @> H; ∅ {{ v, iprop(|={∅, M}=> Φ v) }}) ⊣⊢
+    (WPi t @> H; M {{ Φ }}) := by
+  isplit
+  · iintro Hwp; iapply wpi_shift_mask ∅ M Φ t $$ Hwp
+  · iintro Hwp
+    -- Lost Coq step: the original proof uses `iMod` to open the masked
+    -- hypothesis before re-closing it around `wpi_mask`.
+    sorry
+
+theorem wpi_empty_mask_false (M : CoPset) (t : ITree E R) :
+    ⊢ (|={M, ∅}=> WPi t @> H; ∅ {{ fun _ => iprop(False) }}) -∗
+      (WPi t @> H; M {{ fun _ => iprop(False) }}) := by
+  iintro Hwp
+  -- Lost Coq step: after clearing the mask we still need to normalize
+  -- `|={∅, M}=> False` back to `False`, which again requires fancy-update
+  -- elimination support in the proof mode.
+  sorry
+
+theorem wpi_mask_mono (M M' : CoPset) (Φ : R → PROP) (t : ITree E R) :
+    M ⊆ M' →
+    ⊢ (WPi t @> H; M {{ Φ }}) -∗
+      (WPi t @> H; M' {{ Φ }}) := by
+  intro Hsubset
+  iintro Hwp
+  -- Lost Coq step: the original proof uses `fupd_mask_intro`, which does
+  -- not yet exist as a derived lemma in this Lean development.
+  sorry
+
+end wp_itree_mask_manipulation
+
+section wp_itree_invariant
+
+-- Invariant rules from the Coq development are omitted for now.
+-- This Lean repository does not yet expose an invariant API with
+-- `inv`, `inv_acc`, or `inv_acc_timeless`, so the corresponding masked
+-- WPi lemmas cannot be stated here yet.
+
+end wp_itree_invariant
+
+section wp_itree_stepping
+
+open ITree BIUpdate OFE
+
+variable {E} {H : IHandler (PROP := PROP) E}
+
+theorem wpi_ret' {R} (M : CoPset) (Φ : R → PROP) (r : R) :
+    (|={M}=> Φ r) ⊣⊢
+    (WPi (ret r) @> H; M {{ Φ }}) := by
+  -- Lost Coq step: the original proof combines `wpi_ret_emp_mask'` with
+  -- fancy-mask introduction and elimination.
+  sorry
+
+theorem wpi_ret {R} (M : CoPset) (Φ : R → PROP) (r : R) :
+    ⊢ Φ r -∗
+      (WPi (ret r) @> H; M {{ Φ }}) := by
+  iintro HΦ
+  -- Lost Coq step: need to introduce `|={M}=> Φ r` before using `wpi_ret'`.
+  sorry
+
+theorem wpi_tau {R} (M : CoPset) (Φ : R → PROP) (t : ITree E R) :
+    (WPi t @> H; M {{ fun v => Φ v }}) ⊣⊢
+    (WPi (tau t) @> H; M {{ Φ }}) := by
+  -- Lost Coq step: the original proof rewrites `wpi_mask` and then uses
+  -- the unmasked `wpi_tau_emp_mask`.
+  sorry
+
+theorem wpi_vis' {R} (M : CoPset) (Φ : R → PROP) (i : E.I) (k : E.O i → ITree E R) :
+    (|={M, ∅}=> H.ihandle i
+      (fun a => WPi (k a) @> H; ∅ {{ v, iprop(|={∅, M}=> Φ v) }})
+      (fun a => WPi (k a) @> H; CoPset.full {{ fun _ => iprop(False) }})) ⊣⊢
+    (WPi (vis i k) @> H; M {{ Φ }}) := by
+  -- Lost Coq step: the original proof relies on `iMod`/`iModIntro` with
+  -- fancy updates and an `ihandle_mono` transport.
+  sorry
+
+theorem wpi_vis {R} (M : CoPset) (Φ : R → PROP) (i : E.I) (k : E.O i → ITree E R) :
+    ⊢ (|={M, ∅}=> H.ihandle i
+      (fun a => WPi (k a) @> H; ∅ {{ v, iprop(|={∅, M}=> Φ v) }})
+      (fun a => WPi (k a) @> H; CoPset.full {{ fun _ => iprop(False) }})) -∗
+      (WPi (vis i k) @> H; M {{ Φ }}) := by
+  iintro HH; iapply (wpi_vis' M Φ i k).mp $$ HH
+
+theorem wpi_trigger {E'} [E' -< E] (H' : IHandler (PROP := PROP) E') [InH H' H]
+    (M : CoPset) (i : E'.I) (Φ : E'.O i → PROP) :
+    ⊢ (|={M, ∅}=> H'.ihandle i
+      (fun a => iprop(|={∅, M}=> Φ a))
+      (fun _ => iprop(False))) -∗
+      (WPi (ITree.trigger E' i) @> H; M {{ Φ }}) := by
+  iintro HH
+  -- Lost Coq step: this proof depends on the masked `wpi_vis` rule together
+  -- with fancy-update manipulations inside the event handler.
+  sorry
+
+end wp_itree_stepping
+
+section wp_itree_structural
+
+open ITree BIUpdate OFE
+
+variable {E R} {H : IHandler (PROP := PROP) E} (Φ : R → PROP) (t : ITree E R)
+
+theorem wpi_frame_l (M : CoPset) (P : PROP) :
+    ⊢ P ∗ (WPi t @> H; M {{ Φ }}) -∗
+      (WPi t @> H; M {{ v, iprop(P ∗ Φ v) }}) := by
+  iintro ⟨Hp, Hwp⟩
+  iapply wpi_wand t M Φ $$ [Hp]
+  · iintro %r Hr; isplitl [Hp]; iexact Hp; iexact Hr
+  · iexact Hwp
+
+theorem wpi_frame_r (M : CoPset) (P : PROP) :
+    ⊢ (WPi t @> H; M {{ Φ }}) ∗ P -∗
+      (WPi t @> H; M {{ v, iprop(Φ v ∗ P) }}) := by
+  iintro ⟨Hwp, Hp⟩
+  iapply wpi_wand t M Φ $$ [Hp]
+  · iintro %r Hr; isplitl [Hr]; iexact Hr; iexact Hp
+  · iexact Hwp
+
+end wp_itree_structural
