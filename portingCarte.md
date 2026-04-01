@@ -1,0 +1,110 @@
+# Status of the Program Logics a la Carte port
+
+This file describes the state of the Program Logics a la Carte port relative to the Rocq implementation. The original implementation is here: https://gitlab.mpi-sws.org/iris/itree-program-logic/-/tree/master?ref_type=heads
+
+Not everything should be ported to Lean. In particular, the following parts should **not** be ported:
+- The trace-based adequacy
+- The executable interpreters (this is subsumed by the interpreters given by the coinductive library)
+- The itree semantics for HeapLang (these are already provided by the coinductive library)
+- The correspondence proof of the operational semantics for HeapLang
+- The `islaris` folder
+- The `ITreeToTranslate` infrastructure might not be necessary to port
+- eutt should be replaced by normal equality (and proofs simplified accordingly)
+
+The `islaris` folder should not be ported, all filenames below are relative to the `src` folder.
+
+## `src`
+- [ ] `angelic_choice.v`
+  - `angelicE`: should be given by the itree library
+  - [ ] `angelicH`
+  - [ ] wpi rules
+  - `angelicEH`: should be given by the itree library
+  - [ ] exec adequacy
+- `axioms.v`: not necessary in Lean
+- [ ] `choice.v`
+  - `demonicE`: should be given by the itree library
+  - [ ] `demonicH`
+  - [ ] wpi rules
+  - `demonic_irel`: part of trace based adequacy, should not be ported
+  - `demonic_ifn`: part of trace based adequacy, should not be ported
+  - `demonicEH`: should be given by the itree library
+  - [ ] exec adequacy
+- [ ] `exec.v`
+  - [ ] `bi_close`
+  - [ ] `bi_mono0`
+  - [ ] `lfp_tp`
+  - `eHandler`, `seHandler`, `inEH`, `exec`: provided by the itree library
+  - [ ] `(s)eHandlerAdequate`
+  - [ ] `wpi_tp`
+  - [ ] `wpi_adequate`
+  - `sumEH`: provided by the itree library
+  - `exec`-tactics: port if necessary
+- [ ] `halt.v`
+  - `haltE`: should be given by the itree library
+  - [ ] `haltH`
+  - [ ] wpi rules
+  - `halt_ifn` and corresponding adequacy: part of trace based adequacy, should not be ported
+  - `haltEH`: should be given by the itree library
+  - [ ] exec adequacy
+- [ ] `handler.v`
+  - [ ] `iHandler`
+  - [ ] `sumH`
+  - [ ] `inH`
+  - [ ] `wandH` (unclear if necessary)
+  - [ ] `Sequential`
+- [ ] `heap.v`
+  - `store`, ... functions should be provided by itree library
+  - [ ] `heapGS` and pointsto
+  - [ ] wpi rules
+  - `heap_irel`, `heap_ifn` and corresponding adequacy: part of trace based adequacy, should not be ported
+- `interpreter.v`: should not be ported at the moment
+- `itree.v`: necessary functionality from this file should be provided by the itree library
+- [ ] `state.v`
+  - `stateE`: should be given by the itree library
+  - [ ] `stateH`
+  - [ ] wpi rules
+  - `state_irel`, `state_ifn`, `interp_tr_state` and corresponding adequacy: part of trace based adequacy, should not be ported
+  - `stateEH`: should be given by the itree library
+  - [ ] exec adequacy
+- [ ] `step.v`
+  - `stepE`: should be given by the itree library
+  - it is a bit unclear what to do with the rest of this file, should be discussed
+- `trace.v`: not ported
+- [ ] `ub.v`
+  - `ubE`: should be given by the itree library
+  - [ ] `ubH`
+  - [ ] wpi rules
+  - `ub_ifn`, `interp_tr_ub` and corresponding adequacy: part of trace based adequacy, should not be ported
+  - `ubEH`: should be given by the itree library
+  - [ ] exec adequacy
+- [ ] `void.v`
+  - `voidE`: should be given by the itree library
+  - the rest of the file is not necessary to port
+- [ ] `wpi.v`
+  - [ ] `wpi`
+  - [ ] Lemmas about `wpi` (eqit can become =)
+  - [ ] `wpi_mask`
+  - [ ] Lemmas and Notation about `wpi_mask` (eqit can become =)
+  - `wpi_translation`: might be nice to have but unclear if necessary
+  - [ ] `inH`
+  - tactics: unclear if necessary
+
+## `src/threadpool`
+- `ctrace.v`: part of trace based adequacy, should not be ported
+- [ ] `exec.v`:
+  - `threadpoolEH`: part of itree library
+  - [ ] exec adequacy
+- [ ] `handler.v`:
+  - `threadpoolE`: part of itree library
+  - [ ] `threadpoolH`
+  - [ ] wpi rules
+- `scheduler.v`: part of trace based adequacy, should not be ported
+- `interleaving.v`: part of trace based adequacy, should not be ported
+
+## `src/heaplang`
+
+TODO
+
+## `src/examplelang`
+
+TODO
