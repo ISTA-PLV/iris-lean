@@ -12,8 +12,17 @@ name = "batteries"
 scope = "leanprover-community"
 rev = "v4.27.0"
 
+[[require]]
+name = "Coinductive"
+path = "../coinductive"
+
 [[lean_lib]]
 name = "Iris"
+
+[[lean_lib]]
+name = "Carte"
+srcDir = "."
+globs = ["Carte.*"]
 
 [[lean_lib]]
 name = "IrisTest"
