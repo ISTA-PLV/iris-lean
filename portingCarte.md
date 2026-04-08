@@ -9,20 +9,21 @@ Not everything should be ported to Lean. In particular, the following parts shou
 - The correspondence proof of the operational semantics for HeapLang
 - The `islaris` folder
 - The `ITreeToTranslate` infrastructure might not be necessary to port
+- The `AnswerEqDecision` infrastructure might not be necessary to port
 - eutt should be replaced by normal equality (and proofs simplified accordingly)
 
 The `islaris` folder should not be ported, all filenames below are relative to the `src` folder.
 
 ## `src`
 - [ ] `angelic_choice.v`
-  - `angelicE`: should be given by the itree library
+  - `angelicE`: part of itree library
   - [ ] `angelicH`
   - [ ] wpi rules
-  - `angelicEH`: should be given by the itree library
+  - `angelicEH`: part of itree library
   - [ ] exec adequacy
 - `axioms.v`: not necessary in Lean
 - [ ] `choice.v`
-  - `demonicE`: should be given by the itree library
+  - `demonicE`: part of the itree library
   - [ ] `demonicH`
   - [ ] wpi rules
   - `demonic_irel`: part of trace based adequacy, should not be ported
@@ -37,14 +38,14 @@ The `islaris` folder should not be ported, all filenames below are relative to t
   - [ ] `(s)eHandlerAdequate`
   - [ ] `wpi_tp`
   - [ ] `wpi_adequate`
-  - `sumEH`: provided by the itree library
+  - `sumEH`: part of itree library
   - `exec`-tactics: port if necessary
 - [ ] `halt.v`
-  - `haltE`: should be given by the itree library
+  - `haltE`: part of the itree library
   - [ ] `haltH`
   - [ ] wpi rules
   - `halt_ifn` and corresponding adequacy: part of trace based adequacy, should not be ported
-  - `haltEH`: should be given by the itree library
+  - `haltEH`: part of itree library
   - [ ] exec adequacy
 - [ ] `handler.v`
   - [ ] `iHandler`
@@ -53,29 +54,29 @@ The `islaris` folder should not be ported, all filenames below are relative to t
   - [ ] `wandH` (unclear if necessary)
   - [ ] `Sequential`
 - [ ] `heap.v`
-  - `store`, ... functions should be provided by itree library
+  - `store`, ... functions part of itree library
   - [ ] `heapGS` and pointsto
   - [ ] wpi rules
   - `heap_irel`, `heap_ifn` and corresponding adequacy: part of trace based adequacy, should not be ported
 - `interpreter.v`: should not be ported at the moment
 - `itree.v`: necessary functionality from this file should be provided by the itree library
 - [ ] `state.v`
-  - `stateE`: should be given by the itree library
+  - `stateE`: part of itree library
   - [ ] `stateH`
   - [ ] wpi rules
   - `state_irel`, `state_ifn`, `interp_tr_state` and corresponding adequacy: part of trace based adequacy, should not be ported
-  - `stateEH`: should be given by the itree library
+  - `stateEH`: part of the itree library
   - [ ] exec adequacy
 - [ ] `step.v`
-  - `stepE`: should be given by the itree library
+  - `stepE`: part of the itree library
   - it is a bit unclear what to do with the rest of this file, should be discussed
 - `trace.v`: not ported
 - [ ] `ub.v`
-  - `ubE`: should be given by the itree library
+  - `ubE`: part of the itree library (called `failE`)
   - [ ] `ubH`
   - [ ] wpi rules
   - `ub_ifn`, `interp_tr_ub` and corresponding adequacy: part of trace based adequacy, should not be ported
-  - `ubEH`: should be given by the itree library
+  - `ubEH`: part of the itree library
   - [ ] exec adequacy
 - [ ] `void.v`
   - `voidE`: should be given by the itree library
@@ -92,10 +93,10 @@ The `islaris` folder should not be ported, all filenames below are relative to t
 ## `src/threadpool`
 - `ctrace.v`: part of trace based adequacy, should not be ported
 - [ ] `exec.v`:
-  - `threadpoolEH`: part of itree library
+  - `threadpoolEH`: part of itree library (`concEH`)
   - [ ] exec adequacy
 - [ ] `handler.v`:
-  - `threadpoolE`: part of itree library
+  - `threadpoolE`: part of itree library (`concE`)
   - [ ] `threadpoolH`
   - [ ] wpi rules
 - `scheduler.v`: part of trace based adequacy, should not be ported
