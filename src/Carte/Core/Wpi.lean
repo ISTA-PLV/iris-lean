@@ -9,43 +9,41 @@ open Iris BI ITree
 
 section wp_itree_def
 
-variable {E} {PROP : Type _} [BI PROP] [BIUpdate PROP] (H : IHandler (PROP := PROP) E)
+variable {E} {PROP : Type _} [BI PROP] [BIFUpdate PROP] (H : IHandler (PROP := PROP) E)
 
 -- The definition of the weakest precondition, prior to taking the fixpoint.
 def wpiF {R} (wpi : ITree E R → (R → PROP) → PROP) :
     ITree E R → (R → PROP) → PROP :=
-  fun t Φ =>
+  λ t Φ =>
     iprop(
-      |==> match t.unfold with
-      | ITreeF.ret r => Φ r
-      | ITreeF.tau t' => wpi t' Φ
-      | ITreeF.vis i k =>
-          H.ihandle i
-            (fun a => wpi (k a) Φ)
-            (fun a => iprop(|==> wpi (k a) (fun _ => iprop(False))))
+      |={∅}=> match t.unfold with
+        | ITreeF.ret r => Φ r
+        | ITreeF.tau t' => wpi t' Φ
+        | ITreeF.vis i k => H.ihandle i
+          (λ a => wpi (k a) Φ)
+          (λ a => iprop(|={⊤,∅}=> wpi (k a) (λ _ => iprop(False))))
     )
 
--- [LeibnizO] wrapped version of wpiF
 def wpiF' {R} (wpi : LeibnizO (ITree E R) × (R → PROP) → PROP) :
     LeibnizO (ITree E R) × (R → PROP) → PROP :=
-  fun ⟨t, Φ⟩ => wpiF H (fun t Φ => wpi (⟨t⟩, Φ)) t.car Φ
+  λ ⟨t, Φ⟩ => wpiF H (λ t Φ => wpi (⟨t⟩, Φ)) t.car Φ
 
 /-- Helper function for proving BIMonoPred -/
 instance wpiF'_ne {R} : OFE.NonExpansive (wpiF' H (R := R)) := by
   constructor
   intro n wp1 wp2 Hwp ⟨t, Φ⟩
   cases h : t.car.unfold <;> simp [wpiF', wpiF, h]
-  case tau t' => exact BIUpdate.bupd_ne.ne <| Hwp (⟨t'⟩, Φ)
+  case tau t' => exact BIFUpdate.ne.ne <| Hwp (⟨t'⟩, Φ)
   case vis i k =>
-    apply BIUpdate.bupd_ne.ne
+    apply BIFUpdate.ne.ne
     apply OFE.NonExpansive₂.ne (f := H.ihandle i)
     · intro a; apply Hwp (⟨k a⟩, Φ)
-    · intro a; apply BIUpdate.bupd_ne.ne <| Hwp (⟨k a⟩, fun _ => iprop(False))
+    · intro a; apply BIFUpdate.ne.ne <| Hwp (⟨k a⟩, λ _ => iprop(False))
 
 theorem wpiF_mono {R} (wp1 wp2 : ITree E R → (R → PROP) → PROP) :
     ⊢ □ (∀ t Φ, wp1 t Φ -∗ wp2 t Φ) -∗
       ∀ t Φ, wpiF H wp1 t Φ -∗ wpiF H wp2 t Φ := by
-  iintro □Hwand %t %Φ Hwp
+  iintro #Hwand %t %Φ Hwp
   unfold wpiF
   cases t.unfold <;> simp
   case ret => iexact Hwp
@@ -60,31 +58,29 @@ theorem wpiF'_mono {R} (wp1 wp2 : LeibnizO (ITree E R) × (R → PROP) → PROP)
     ⊢ □ (∀ t Φ, wp1 (t, Φ) -∗ wp2 (t, Φ)) -∗
       ∀ t Φ, wpiF' H wp1 (t, Φ) -∗ wpiF' H wp2 (t, Φ) := by
   simp [wpiF']
-  iintro □Hwand %t' %Φ Hwp
+  iintro #Hwand %t' %Φ Hwp
   cases t' with | mk t =>
     simp only
-    iapply wpiF_mono (wp1 := fun t Φ => wp1 ({ car := t }, Φ)) (wp2 := fun t Φ => wp2 ({ car := t }, Φ))
-    . iintro !> %t' %Φ' Hw; iapply Hwand $$ %⟨t'⟩, %Φ', Hw
+    iapply wpiF_mono (wp1 := λ t Φ => wp1 ({ car := t }, Φ)) (wp2 := λ t Φ => wp2 ({ car := t }, Φ))
+    . iintro !> %t' %Φ' Hw; iapply Hwand $$ %⟨t'⟩ %Φ' Hw
     . iexact Hwp
 /-- End of Helper -/
 
 instance {R} : BIMonoPred (λ wp_itree : LeibnizO (ITree E R) × (R → PROP) → PROP => wpiF' H wp_itree) where
   mono_pred := by
-    iintro %Φ %Ψ %HΦ %HΨ □H %pair Hsim
-    iapply wpiF'_mono (wp1 := Φ) (wp2 := Ψ)
+    iintro %Φ %Ψ %HΦ %HΨ #H %pair Hsim; iapply wpiF'_mono
     . iintro !> %t %Φ1; iapply H
     . iexact Hsim
   mono_pred_ne := by
     intro wp Hwp; constructor; intro n ⟨t1, Ψ1⟩ ⟨t2, Ψ2⟩ ⟨Ht, HΨ⟩
     simp at Ht HΨ; subst Ht
     cases h : t1.car.unfold <;> simp [wpiF', wpiF, h]
-    case ret r => exact BIUpdate.bupd_ne.ne (HΨ r)
-    case tau t' => exact BIUpdate.bupd_ne.ne <| Hwp.ne ⟨rfl, HΨ⟩
+    case ret r => exact BIFUpdate.ne.ne (HΨ r)
+    case tau t' => exact BIFUpdate.ne.ne <| Hwp.ne ⟨rfl, HΨ⟩
     case vis i k =>
-      apply BIUpdate.bupd_ne.ne
-      apply OFE.NonExpansive₂.ne (f := H.ihandle i)
-      · intro a; exact Hwp.ne ⟨rfl, HΨ⟩
-      · intro a; apply BIUpdate.bupd_ne.ne <| Hwp.ne ⟨rfl, fun _ => .rfl⟩
+      apply BIFUpdate.ne.ne; apply OFE.NonExpansive₂.ne <;> intro a
+      · exact Hwp.ne ⟨rfl, HΨ⟩
+      · apply BIFUpdate.ne.ne <| Hwp.ne ⟨rfl, λ _ => .rfl⟩
 
 /-- The weakest precondition is defined as the least fixpoint of [wpiF']. -/
 def wpi {E R} (H : IHandler (PROP := PROP) E) (t : ITree E R) (Φ : R → PROP) : PROP :=
@@ -104,17 +100,16 @@ section wp_itree_def
 
 open OFE
 
-variable {E R} {PROP : Type _} [BI PROP] [BIUpdate PROP]
+variable {E R} {PROP : Type _} [BI PROP] [BIFUpdate PROP]
   (H : IHandler (PROP := PROP) E) (t : ITree E R)
 
-instance : NonExpansive (fun Φ => WPi t @> H {{ Φ }}) := by
-  constructor
-  intro n Φ₁ Φ₂ HΦ
+instance : NonExpansive (λ Φ => WPi t @> H {{ Φ }}) := by
+  constructor; intro n Φ₁ Φ₂ HΦ
   exact NonExpansive.ne (f := bi_least_fixpoint (wpiF' H)) ⟨rfl, HΦ⟩
 
 theorem wpi_post_congr {Φ Ψ : R → PROP} (HΦ : Φ ≡ Ψ) :
     (WPi t @> H {{ Φ }}) ⊣⊢ (WPi t @> H {{ Ψ }}) :=
-  equiv_iff.mp <| NonExpansive.eqv (f := fun Φ => WPi t @> H {{ Φ }}) HΦ
+  equiv_iff.mp <| NonExpansive.eqv (f := λ Φ => WPi t @> H {{ Φ }}) HΦ
 
 end wp_itree_def
 
@@ -123,18 +118,16 @@ section wp_itree_stepping
 
 open ITree BIUpdate OFE
 
-variable {E} {PROP : Type _} [BI PROP] [BIUpdate PROP] (H : IHandler (PROP := PROP) E)
+variable {E} {PROP : Type _} [BI PROP] [BIFUpdate PROP] (H : IHandler (PROP := PROP) E)
 
 -- Lean's `rw` does not work with BI equivalences, so we package this update-absorption step as a lemma.
 theorem wpi_update_emp_mask {R} (Φ : R → PROP) (t : ITree E R) :
-    (|==> wpi H t Φ) ⊣⊢ wpi H t Φ := by
-  have hUnfold := by simpa [wpiF] using (equiv_iff.mpr <| wpi_unfold_emp_mask H t Φ)
-  exact equiv_iff.mp <|
-    (bupd_ne.eqv hUnfold).trans <|
-    (equiv_iff.mpr <| bupd_idem).trans hUnfold.symm
+    (|={∅}=> wpi H t Φ) ⊣⊢ wpi H t Φ :=
+  equiv_iff.mp <| (BIFUpdate.ne.eqv <| equiv_iff.mpr <| wpi_unfold_emp_mask H t Φ).trans <|
+    (equiv_iff.mpr <| fupd_idem).trans <| (equiv_iff.mpr <| wpi_unfold_emp_mask H t Φ).symm
 
 theorem wpi_ret_emp_mask' {R} (Φ : R → PROP) (r : R) :
-    (|==> Φ r) ⊣⊢ (WPi (ret r) @> H {{ Φ }}) :=
+    (|={∅}=> Φ r) ⊣⊢ (WPi (ret r) @> H {{ Φ }}) :=
   (wpi_unfold_emp_mask H (ret r) Φ).symm
 
 theorem wpi_ret_emp_mask {R} (Φ : R → PROP) (r : R) :
@@ -146,23 +139,22 @@ theorem wpi_tau_emp_mask {R} (Φ : R → PROP) (t : ITree E R) :
   (wpi_unfold_emp_mask H (tau t) Φ).trans <| wpi_update_emp_mask H Φ t
 
 theorem wpi_vis_emp_mask' {R} (Φ : R → PROP) (i : E.I) (k : E.O i → ITree E R) :
-    (|==> H.ihandle i
-      (fun a => WPi k a @> H {{ Φ }})
-      (fun a => iprop(|==> (WPi k a @> H {{ fun _ => iprop(False) }})))) ⊣⊢
+    (|={∅}=> H.ihandle i
+      (λ a => WPi k a @> H {{ Φ }})
+      (λ a => iprop(|={⊤,∅}=> (WPi k a @> H {{ λ _ => iprop(False) }})))) ⊣⊢
     (WPi (vis i k) @> H {{ Φ }}) := by
   refine BiEntails.trans ?_ (wpi_unfold_emp_mask H (vis i k) Φ).symm
   simp [wpiF]
 
 theorem wpi_vis_emp_mask {R} (Φ : R → PROP) (i : E.I) (k : E.O i → ITree E R) :
-    ⊢ H.ihandle i
-      (fun a => WPi k a @> H {{ Φ }})
-      (fun a => iprop(|==> (WPi k a @> H {{ fun _ => iprop(False) }}))) -∗
+    H.ihandle i (λ a => WPi k a @> H {{ Φ }})
+      (λ a => iprop(|={⊤,∅}=> (WPi k a @> H {{ λ _ => iprop(False) }}))) ⊢
     (WPi (vis i k) @> H {{ Φ }}) := by
   iintro Hwp; iapply (wpi_vis_emp_mask' H Φ i k).mp; imodintro; iexact Hwp
 
 instance uncurry_G_ne {R} (G : ITree E R → (R → PROP) → PROP) :
     (∀ t, NonExpansive (G t)) →
-    NonExpansive (fun ((t, Φ) : LeibnizO (ITree E R) × (R → PROP)) => G t.car Φ) := by
+    NonExpansive (λ ((t, Φ) : LeibnizO (ITree E R) × (R → PROP)) => G t.car Φ) := by
   intro Hne; constructor
   intro n ⟨t₁, Φ₁⟩ ⟨t₂, Φ₂⟩ ⟨Ht, HΦ⟩; simp at Ht HΦ
   cases t₁ with | mk t₁ =>
@@ -177,29 +169,29 @@ section wp_itree_induction
 
 open ITree BIUpdate OFE
 
-variable {E R} {PROP : Type _} [BI PROP] [BIUpdate PROP]
+variable {E R} {PROP : Type _} [BI PROP] [BIFUpdate PROP]
   (H : IHandler (PROP := PROP) E) (G : ITree E R → (R → PROP) → PROP)
 
 theorem wpi_ind_emp_mask : (∀ t, NonExpansive (G t)) →
-    ⊢ □ (∀ t Φ, wpiF H (fun t' Ψ => iprop(G t' Ψ ∧ (WPi t' @> H {{Ψ}}))) t Φ -∗ G t Φ) -∗
+    ⊢ □ (∀ t Φ, wpiF H (λ t' Ψ => iprop(G t' Ψ ∧ (WPi t' @> H {{Ψ}}))) t Φ -∗ G t Φ) -∗
       ∀ t Φ, (WPi t @> H {{ Φ }}) -∗ G t Φ := by
   iintro %Hne #HPre %t %Φ
-  let G' : LeibnizO (ITree E R) × (R → PROP) → PROP := fun ⟨t, Φ⟩ => G t.car Φ
+  let G' : LeibnizO (ITree E R) × (R → PROP) → PROP := λ ⟨t, Φ⟩ => G t.car Φ
   haveI _ := uncurry_G_ne G Hne
-  ihave HPre' : □ (∀ y, wpiF' H (fun x => iprop(G' x ∧ bi_least_fixpoint (wpiF' H) x)) y -∗ G' y) $$ []
+  ihave HPre' : □ (∀ y, wpiF' H (λ x => iprop(G' x ∧ bi_least_fixpoint (wpiF' H) x)) y -∗ G' y) $$ []
   · iintro !> %y
     cases y with | mk t' Ψ =>
       simp [G', wpiF', wpi] at ⊢
       iintro Hx
       iapply HPre $$ Hx
   simp [wpi, G'] at ⊢
-  iapply (least_fixpoint_ind (wpiF' H) G') $$ HPre', %(⟨t⟩, Φ)
+  iapply (least_fixpoint_ind (wpiF' H) G') $$ HPre' %(⟨t⟩, Φ)
 
 theorem wpi_iter_emp_mask : (∀ t, NonExpansive (G t)) →
     ⊢ □ (∀ t Φ, wpiF H G t Φ -∗ G t Φ) -∗
       ∀ t Φ, (WPi t @> H {{ Φ }}) -∗ G t Φ := by
   iintro %Hne #HPre %t %Φ
-  let G' : LeibnizO (ITree E R) × (R → PROP) → PROP := fun ⟨t, Φ⟩ => G t.car Φ
+  let G' : LeibnizO (ITree E R) × (R → PROP) → PROP := λ ⟨t, Φ⟩ => G t.car Φ
   haveI _ := uncurry_G_ne G Hne
   ihave HPre' : □ (∀ y, wpiF' H G' y -∗ G' y) $$ []
   · iintro !> %y
@@ -208,13 +200,13 @@ theorem wpi_iter_emp_mask : (∀ t, NonExpansive (G t)) →
       iintro Hx
       iapply HPre $$ Hx
   simp [wpi, G'] at ⊢
-  iapply least_fixpoint_iter <| wpiF' H $$ HPre', %(⟨t⟩, Φ)
+  iapply least_fixpoint_iter <| wpiF' H $$ HPre' %(⟨t⟩, Φ)
 
 theorem wpi_iter_emp_mask' : (∀ t, OFE.NonExpansive (G t)) →
-    ⊢ □ (∀ Φ r, (|==> Φ r) -∗ G (ret r) Φ) -∗
-      □ (∀ Φ t, (|==> G t Φ) -∗ G (tau t) Φ) -∗
-      □ (∀ Φ i k, (|==> H.ihandle i (fun a => G (k a) Φ)
-          (fun a => iprop(|==> G (k a) (fun _ => iprop(False))))) -∗
+    ⊢ □ (∀ Φ r, (|={∅}=> Φ r) -∗ G (ret r) Φ) -∗
+      □ (∀ Φ t, (|={∅}=> G t Φ) -∗ G (tau t) Φ) -∗
+      □ (∀ Φ i k, (|={∅}=> H.ihandle i (λ a => G (k a) Φ)
+          (λ a => iprop(|={⊤,∅}=> G (k a) (λ _ => iprop(False))))) -∗
         G (vis i k) Φ) -∗
       ∀ t Φ, (WPi t @> H {{ Φ }}) -∗ G t Φ := by
   iintro %Hne #HRet #HTau #HVis; iapply wpi_iter_emp_mask H G Hne;
@@ -229,38 +221,41 @@ end wp_itree_induction
 
 section wp_itree_derived
 
-open ITree BIUpdate OFE
+open ITree OFE
 
-variable {E R} {PROP : Type _} [BI PROP] [BIUpdate PROP] (H : IHandler (PROP := PROP) E)
-  (t : ITree E R)
+variable {E R} {PROP : Type _} [BI PROP] [BIFUpdate PROP]
+  (H : IHandler (PROP := PROP) E) (t : ITree E R)
 
 theorem wpi_upd_wand_emp_mask (Φ Ψ : R → PROP) :
-    ⊢ (∀ r, iprop((|==> Φ r) -∗ (|==> Ψ r))) -∗
+    ⊢ (∀ r, iprop((|={∅}=> Φ r) -∗ (|={∅}=> Ψ r))) -∗
       (WPi t @> H {{ Φ }}) -∗
       (WPi t @> H {{ Ψ }}) := by
   iintro Hwand Hwp
   let G : ITree E R → (R → PROP) → PROP :=
-    fun t Φ => iprop(∀ (Ψ : R → PROP), (∀ r, |==> Φ r -∗ |==> Ψ r) -∗ (WPi t @> H {{ Ψ }}))
-  iapply wpi_iter_emp_mask' H G $$ [], [], [], [Hwp], [Hwand]
+    λ t Φ => iprop(∀ (Ψ : R → PROP), (∀ r, iprop((|={∅}=> Φ r) -∗ (|={∅}=> Ψ r))) -∗ (WPi t @> H {{ Ψ }}))
+  iapply wpi_iter_emp_mask' H G $$ [] [] [] [Hwp] [Hwand]
   . -- Prove G t is non-expansive
     intro t; constructor; intro n Φ₁ Φ₂ HΦ; simp [G];
     apply forall_ne; intro Ψ; refine wand_ne.ne ?_ .rfl
-    apply forall_ne; intro r; exact wand_ne.ne (bupd_ne.ne (HΦ r)) .rfl
+    apply forall_ne; intro r
+    exact wand_ne.ne (BIFUpdate.ne.ne (HΦ r)) .rfl
   . -- Case ret r
     iintro !> %Φ %r HΦr; simp [G]
     iintro %Ψ Hr; iapply wpi_ret_emp_mask'; iapply Hr $$ HΦr
   . -- Case tau t'
-    iintro !> %Φ %r HG; simp [G]
+    iintro !> %Φ %t' HG; simp [G]
     iintro %Ψ Hwand; iapply wpi_tau_emp_mask; iapply wpi_update_emp_mask
-    imod HG; imodintro; iapply HG $$ %Ψ, Hwand
+    imod HG; imodintro; iapply HG $$ %Ψ Hwand
   . -- Case vis i k
     iintro !> %Φ %i %k HG; simp[G]
-    iintro %Ψ Hwand; iapply wpi_vis_emp_mask';
-    imod HG; imodintro;
-    iapply H.ihandle_mono i (fun a => iprop(∀ Ψ, (∀ r, |==> Φ r -∗ |==> Ψ r) -∗ wpi H (k a) Ψ)) _
-      <| fun a => iprop(|==> ∀ Ψ, (∀ r, |==> False -∗ |==> Ψ r) -∗ wpi H (k a) Ψ) $$ [Hwand]
-    . iintro %x HG; iapply HG $$ %Ψ, Hwand
-    . iintro !> %x HG; iapply HG; iintro !> %r Hfalse; iexact Hfalse
+    iintro %Ψ Hwand; iapply wpi_vis_emp_mask'
+    imod HG; imodintro
+    iapply H.ihandle_mono i
+      (λ a => iprop(∀ Ψ, (∀ r, iprop((|={∅}=> Φ r) -∗ (|={∅}=> Ψ r))) -∗ wpi H (k a) Ψ))
+      _ (λ a => iprop(|={⊤,∅}=> G (k a) (λ _ => iprop(False)))) _ $$ [Hwand] [] [HG]
+    . iintro %x HG; iapply HG $$ %Ψ Hwand
+    . imodintro; iintro %x HG; imod HG; imodintro; iapply HG
+      iintro %r Hfalse; iexact Hfalse
     . iexact HG
   . iexact Hwp
   . iexact Hwand
@@ -275,13 +270,13 @@ theorem wpi_wand_emp_mask (Φ Ψ : R → PROP) :
   . iexact Hwp
 
 theorem wpi_update_post_emp_mask :
-    (WPi t @> H {{ v, iprop(|==> Φ v) }}) ⊣⊢
+    (WPi t @> H {{ v, iprop(|={∅}=> Φ v) }}) ⊣⊢
     (WPi t @> H {{ Φ }}) := by
   isplit <;> iintro Hwp
-  · iapply wpi_upd_wand_emp_mask H t (fun v => iprop(|==> Φ v)) Φ
-    . iintro %r Hidem; iapply bupd_idem.mp; iexact Hidem
+  · iapply wpi_upd_wand_emp_mask H t (λ v => iprop(|={∅}=> Φ v)) Φ
+    . iintro %r Hidem; iapply fupd_idem.mp; iexact Hidem
     . iexact Hwp
-  . iapply wpi_upd_wand_emp_mask H t Φ <| fun v => iprop(|==> Φ v)
+  . iapply wpi_upd_wand_emp_mask H t Φ <| λ v => iprop(|={∅}=> Φ v)
     . iintro %r HΦr; imodintro; iexact HΦr
     . iexact Hwp
 
@@ -290,8 +285,8 @@ theorem wpi_bind_emp_mask {R T} (t : ITree E T) (k : T → ITree E R) (Φ : R �
       (WPi (t >>= k) @> H {{ Φ }}) := by
   iintro Hwp
   let G : ITree E T → (T → PROP) → PROP :=
-    fun t Φ => iprop(∀ (Ψ : R → PROP) k', (∀ x, Φ x -∗ wpi H (k' x) Ψ) -∗ wpi H (t >>= k') Ψ)
-  iapply wpi_iter_emp_mask' H G $$ [], [], [], [Hwp]
+    λ t Φ => iprop(∀ (Ψ : R → PROP) k', (∀ x, Φ x -∗ wpi H (k' x) Ψ) -∗ wpi H (t >>= k') Ψ)
+  iapply wpi_iter_emp_mask' H G $$ [] [] [] [Hwp]
   . -- Prove G t is non-expansive
     intro t; constructor; intro n Φ₁ Φ₂ HΦ; simp [G]
     apply forall_ne; intro Ψ; apply forall_ne; intro k'
@@ -309,8 +304,8 @@ theorem wpi_bind_emp_mask {R T} (t : ITree E T) (k : T → ITree E R) (Φ : R �
   . -- Case vis i k
     iintro !> %Φ %i %k Hwand; simp [G]
     iintro %Ψ %k' Hk'; iapply wpi_vis_emp_mask'; imod Hwand; imodintro
-    iapply H.ihandle_mono i (fun a => iprop(∀ Ψ k', (∀ x, Φ x -∗ wpi H (k' x) Ψ) -∗ wpi H (k a >>= k') Ψ)) _
-      <| fun a => iprop(|==> ∀ Ψ k', (∀ x, False -∗ wpi H (k' x) Ψ) -∗ wpi H (k a >>= k') Ψ) $$ [Hk']
+    iapply H.ihandle_mono i (λ a => iprop(∀ Ψ k', (∀ x, Φ x -∗ wpi H (k' x) Ψ) -∗ wpi H (k a >>= k') Ψ)) _
+      <| λ a => iprop(|={⊤,∅}=> ∀ Ψ k', (∀ x, False -∗ wpi H (k' x) Ψ) -∗ wpi H (k a >>= k') Ψ) $$ [Hk']
     . iintro %a Hwand; iapply Hwand $$ Hk'
     . iintro !> %a Hwand; imod Hwand; imodintro; iapply Hwand;
       iintro %x Hfalse; iexfalso; iexact Hfalse
@@ -325,8 +320,8 @@ section wp_itree_structural
 
 open ITree BIUpdate OFE
 
-variable {E R} {PROP : Type _} [BI PROP] [BIUpdate PROP] (H : IHandler (PROP := PROP) E)
-  (Φ : R → PROP) (t : ITree E R)
+variable {E R} {PROP : Type _} [BI PROP] [BIFUpdate PROP]
+  (H : IHandler (PROP := PROP) E) (Φ : R → PROP) (t : ITree E R)
 
 theorem wpi_frame_l_emp_mask (P : PROP) :
     ⊢ P ∗ (WPi t @> H {{ Φ }}) -∗

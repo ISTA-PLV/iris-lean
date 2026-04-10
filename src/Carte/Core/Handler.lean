@@ -35,7 +35,7 @@ instance {PROP E} [BI PROP] (H : IHandler (PROP := PROP) E) (i : E.I) :
       . iintro %a H; iexact H
       . isplitr; imodintro; iintro %a H; iexact H; iexact Hwand
     . iintro ⟨%Φ', ⟨%s', ⟨HmonΦ, ⟨Hmons, HH⟩⟩⟩⟩
-      iapply H.ihandle_mono $$ HmonΦ, Hmons, HH
+      iapply H.ihandle_mono $$ HmonΦ Hmons HH
   apply (Hmon Φ₁ s₁).dist.trans
   apply ((exists_ne fun Φ' => ?_)).trans (Hmon Φ₂ s₂).dist.symm
   refine exists_ne fun s' => ?_
@@ -57,8 +57,8 @@ def sumH : IHandler (PROP := PROP) (E₁ ⊕ₑ E₂) where
   ihandle_mono := by
     iintro %e %Φ %Φ' %s %s' HΦwand #Hswand HH
     cases e with
-    | inl e1 => simp at Φ Φ' s s' ⊢; iapply H₁.ihandle_mono $$ HΦwand, Hswand, HH
-    | inr e2 => simp at Φ Φ' s s' ⊢; iapply H₂.ihandle_mono $$ HΦwand, Hswand, HH
+    | inl e1 => simp at Φ Φ' s s' ⊢; iapply H₁.ihandle_mono $$ HΦwand Hswand HH
+    | inr e2 => simp at Φ Φ' s s' ⊢; iapply H₂.ihandle_mono $$ HΦwand Hswand HH
 infixr:30 " ⊕ₕ " => sumH
 
 theorem sumH_ihandle_inl (i : E₁.I) (Φ s) : (H₁ ⊕ₕ H₂).ihandle (.inl i) Φ s = H₁.ihandle i Φ s := rfl
