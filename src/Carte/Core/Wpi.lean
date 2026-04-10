@@ -96,6 +96,10 @@ end wp_itree_def
 macro:20 "WPi " t:term:20 " @> " H:term:20 " {{ " Φ:term:20 " }}" : term => `(wpi $H $t $Φ)
 macro:20 "WPi " t:term:20 " @> " H:term:20 " {{ " v:ident " , " Q:term:20 " }}" : term => `(wpi $H $t (fun $v => $Q))
 
+delab_rule wpi
+  | `($_ $H $t (fun $v:ident => $Q)) => `(WPi $t @> $H {{ $v, $Q }})
+  | `($_ $H $t $Φ) => `(WPi $t @> $H {{ $Φ }})
+
 section wp_itree_def
 
 open OFE

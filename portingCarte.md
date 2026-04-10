@@ -82,11 +82,13 @@ The `islaris` folder should not be ported, all filenames below are relative to t
   - `voidE`: should be given by the itree library
   - the rest of the file is not necessary to port
 - [ ] `wpi.v`
-  - [ ] `wpi`
-  - [ ] Lemmas about `wpi` (eqit can become =)
-  - [ ] `wpi_mask`
-  - [ ] Lemmas and Notation about `wpi_mask` (eqit can become =)
-  - `wpi_translation`: might be nice to have but unclear if necessary
+  - [x] `wpi` (split into `Core/Wpi.lean` and `WpiMask.lean`)
+  - [x] Lemmas about `wpi` (eqit can become =)
+  - [x] `wpi_mask`
+  - [x] Lemmas and Notation about `wpi_mask` (eqit can become =)
+    - [ ] invariant related (need `inv` and `iinv`)
+    - [x] others
+  - [ ] `wpi_translation`: might be nice to have but unclear if necessary
   - [ ] `inH`
   - tactics: unclear if necessary
 
