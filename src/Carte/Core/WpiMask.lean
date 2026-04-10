@@ -8,66 +8,59 @@ import ITree.Effect
 
 open Iris BI ITree
 
-variable {PROP : Type _} [BI PROP] [BIUpdate PROP] [BIFUpdate PROP]
+variable {PROP : Type _} [BI PROP] [BIFUpdate PROP]
 
 section wpi_tree_mask_def
 
-variable {E} {H : IHandler (PROP := PROP) E}
+variable {E} (M : CoPset) (H : IHandler (PROP := PROP) E)
 
 open OFE
 
-def wpi_mask (M : CoPset) (t : ITree E R) (Φ : R → PROP) : PROP :=
-  iprop(|={M, ∅}=> wpi H t (fun v => iprop(|={∅, M}=> Φ v)))
+def wpi_mask (t : ITree E R) (Φ : R → PROP) : PROP :=
+  iprop(|={M,∅}=> wpi H t (λ v => iprop(|={∅,M}=> Φ v)))
 
-instance wpi_mask_ne (M : CoPset) (t : ITree E R) :
-    OFE.NonExpansive (fun Φ => wpi_mask (H := H) M t Φ) := by
+instance wpi_mask_ne (t : ITree E R) :
+    OFE.NonExpansive (λ Φ => wpi_mask (H := H) M t Φ) := by
   constructor
   intro n Φ₁ Φ₂ HΦ
   apply BIFUpdate.ne.ne
   apply NonExpansive.ne
-  exact fun v => BIFUpdate.ne.ne (HΦ v)
+  exact λ v => BIFUpdate.ne.ne (HΦ v)
 
 end wpi_tree_mask_def
 
-macro:20 "WPi " t:term:20 " @> " H:term:20 " ; " M:term:20 " {{ " Φ:term:20 " }}" : term => `(wpi_mask (H := $H) $M $t $Φ)
-macro:20 "WPi " t:term:20 " @> " H:term:20 " ; " M:term:20 " {{ " v:ident " , " Q:term:20 " }}" : term => `(wpi_mask (H := $H) $M $t <| fun $v => $Q)
+macro:20 "WPi " t:term:20 " @> " H:term:20 ";" M:term:20 " {{ " Φ:term:20 " }}" : term => `(wpi_mask (H := $H) $M $t $Φ)
+macro:20 "WPi " t:term:20 " @> " H:term:20 ";" M:term:20 " {{ " v:ident " , " Q:term:20 " }}" : term => `(wpi_mask (H := $H) $M $t <| λ $v => $Q)
 
 section wpi_tree_mask_def
 
 open OFE
 
-variable {E} {H : IHandler (PROP := PROP) E}
+variable {E} {M : CoPset} {H : IHandler (PROP := PROP) E}
 
--- [Warning]: Helper function, only for the current development stage
--- After fancy update finished, if we can replace the basic update in Wpi
--- This thoeorem does not need any longer
-theorem hmask_equiv {R} (t : ITree E R) Φ : (WPi t @> H; ∅ {{ Φ }}) ⊣⊢ wpi H t Φ := by
-  have fup_bup_equiv : ∀ {P : PROP}, iprop(|={∅, ∅}=> P) ⊣⊢ iprop(|==> P) := by
-    sorry
-  apply fup_bup_equiv.trans
-  have hpost := wpi_post_congr H t (fun v => equiv_iff.mpr <| fup_bup_equiv (P := Φ v))
-  exact equiv_iff.mp <| (BIUpdate.bupd_ne.eqv <| equiv_iff.mpr hpost).trans <|
-      (BIUpdate.bupd_ne.eqv <| equiv_iff.mpr <| wpi_update_post_emp_mask H t (Φ := Φ)).trans <|
-      equiv_iff.mpr <| wpi_update_emp_mask H Φ t
+theorem wpi_empty_mask_equiv {R} (t : ITree E R) (Φ : R → PROP) :
+    (WPi t @> H;∅ {{ Φ }}) ⊣⊢ (WPi t @> H {{ Φ }}) :=
+  (equiv_iff.mp <| BIFUpdate.ne.eqv <| equiv_iff.mpr <|
+    wpi_update_post_emp_mask H t).trans <| wpi_update_emp_mask H Φ t
 
 theorem wpi_unfold {R} (t : ITree E R) Φ :
-    (WPi t @> H;∅ {{ Φ }}) ⊣⊢ ((wpiF H <| fun t Φ => WPi t @> H;∅ {{ Φ }}) t Φ) := by
-  apply (hmask_equiv t Φ).trans; apply (wpi_unfold_emp_mask H t Φ).trans
-  isplit
-  · iintro Hwp; iapply wpiF_mono H (wpi H) <| fun t Φ => WPi t @> H; ∅ {{ Φ }}
-    · iintro !> %t %Φ Hw; iapply (hmask_equiv t Φ).mpr $$ Hw
+    (WPi t @> H;∅ {{ Φ }}) ⊣⊢ ((wpiF H <| λ t Φ => WPi t @> H;∅ {{ Φ }}) t Φ) := by
+  apply (wpi_empty_mask_equiv t Φ).trans; apply (wpi_unfold_emp_mask H t Φ).trans
+  isplit <;> iintro Hwp
+  · iapply wpiF_mono (H := H) <| wpi H
+    · iintro !> %t %Φ Hwp; iapply (wpi_empty_mask_equiv (H := H) t Φ).mpr $$ Hwp
     · iexact Hwp
-  · iintro Hwp; iapply wpiF_mono H (fun t Φ => WPi t @> H; ∅ {{ Φ }}) <| wpi H
-    · iintro !> %t %Φ Hw; iapply (hmask_equiv t Φ).mp $$ Hw
+  · iapply wpiF_mono (H := H) _ <| wpi H
+    · iintro !> %t %Φ Hwp; iapply (wpi_empty_mask_equiv (H := H) t Φ).mp $$ Hwp
     · iexact Hwp
 
-instance (M : CoPset)  (t : ITree E R) : NonExpansive (fun Φ => WPi t @> H; M {{ Φ }}) :=
-  wpi_mask_ne (H := H) M t
+instance wpi_ne {R} (t : ITree E R) : NonExpansive (λ Φ => WPi t @> H; M {{ Φ }}) :=
+  wpi_mask_ne M H t
 
-theorem wpi_mask_post_congr (M : CoPset) (t : ITree E R) {Φ Ψ : R → PROP}
+theorem wpi_mask_post_congr (t : ITree E R) {Φ Ψ : R → PROP}
     (HΦ : Φ ≡ Ψ) :
     (WPi t @> H; M {{ Φ }}) ⊣⊢ (WPi t @> H; M {{ Ψ }}) :=
-  equiv_iff.mp <| NonExpansive.eqv (f := fun Φ => WPi t @> H; M {{ Φ }}) HΦ
+  equiv_iff.mp <| NonExpansive.eqv (f := λ Φ => WPi t @> H; M {{ Φ }}) HΦ
 
 end wpi_tree_mask_def
 
@@ -79,34 +72,38 @@ open OFE ITree
 variable {E R} {H : IHandler (PROP := PROP) E} (G : ITree E R → (R → PROP) → PROP)
 
 theorem wpi_ind : (∀ t, NonExpansive (G t)) →
-    ⊢ □ (∀ t Φ, wpiF H (fun t' Ψ => iprop(G t' Ψ ∧ (WPi t' @> H;∅ {{ Ψ }}))) t Φ -∗ G t Φ) -∗
-      ∀ t Φ, (WPi t @> H;∅ {{ Φ }}) -∗ G t Φ := by
+    □ (∀ t Φ, wpiF H (λ t' Ψ => iprop(G t' Ψ ∧ (WPi t' @> H;∅ {{ Ψ }}))) t Φ -∗ G t Φ) ⊢
+    ∀ t Φ, (WPi t @> H;∅ {{ Φ }}) -∗ G t Φ := by
   iintro %Hne #HPre %t %Φ Hwp
   iapply wpi_ind_emp_mask H G Hne
-  . iintro !> %t %Φ Hx; iapply HPre; iapply wpiF_mono H <| fun t' Ψ => iprop(G t' Ψ ∧ (WPi t' @> H {{ Ψ }}))
-    . iintro !> %t' %Φ' Hpair; isplit
-      . iapply and_elim_l $$ Hpair
-      . iapply (hmask_equiv t' Φ').mpr; iapply and_elim_r $$ Hpair
-    . iexact Hx
-  . iapply hmask_equiv t Φ $$ Hwp
+  · iintro !> %t %Φ Hx; iapply HPre; iapply wpiF_mono H <| λ t' Ψ => iprop(G t' Ψ ∧ (WPi t' @> H {{ Ψ }}))
+    · iintro !> %t' %Φ' Hpair; isplit
+      · iapply and_elim_l $$ Hpair
+      · iapply wpi_empty_mask_equiv; iapply and_elim_r $$ Hpair
+    · iexact Hx
+  · iapply wpi_empty_mask_equiv $$ Hwp
 
 theorem wpi_iter : (∀ t, NonExpansive (G t)) →
-    ⊢ □ (∀ t Φ, wpiF H G t Φ -∗ G t Φ) -∗
-      ∀ t Φ, (WPi t @> H;∅ {{ Φ }}) -∗ G t Φ := by
+    □ (∀ t Φ, wpiF H G t Φ -∗ G t Φ) ⊢
+    ∀ t Φ, (WPi t @> H;∅ {{ Φ }}) -∗ G t Φ := by
   iintro %Hne #HRet %t %Φ Hwp
   iapply wpi_iter_emp_mask H G Hne $$ HRet
-  iapply hmask_equiv $$ Hwp
+  iapply wpi_empty_mask_equiv $$ Hwp
 
 theorem wpi_iter' : (∀ t, OFE.NonExpansive (G t)) →
-    ⊢ □ (∀ Φ r, (|==> Φ r) -∗ G (ret r) Φ) -∗
-      □ (∀ Φ t, (|==> G t Φ) -∗ G (tau t) Φ) -∗
-      □ (∀ Φ i k, (|==> H.ihandle i (fun a => G (k a) Φ)
-          (fun a => iprop(|==> G (k a) (fun _ => iprop(False))))) -∗
-        G (vis i k) Φ) -∗
+    ⊢ □ (∀ Φ r, (|={∅}=> Φ r) -∗ G (ret r) Φ) -∗
+      □ (∀ Φ t, (|={∅}=> G t Φ) -∗ G (tau t) Φ) -∗
+      □ (∀ Φ i k, (|={∅}=> H.ihandle i
+          (λ a => G (k a) Φ)
+          (λ a => iprop(|={⊤,∅}=> G (k a) (λ _ => iprop(False))))) -∗
+            G (vis i k) Φ) -∗
       ∀ t Φ, (WPi t @> H;∅ {{ Φ }}) -∗ G t Φ := by
   iintro %Hne #HRet #HTau #HVis %t %Φ Hwp
-  iapply wpi_iter_emp_mask' H G Hne $$ HRet, HTau, HVis
-  iapply hmask_equiv $$ Hwp
+  iapply wpi_iter_emp_mask' H G Hne
+  · iexact HRet
+  · iexact HTau
+  · iexact HVis
+  · iapply wpi_empty_mask_equiv $$ Hwp
 
 end wp_itree_induction
 
@@ -120,11 +117,10 @@ theorem wpi_wand (M : CoPset) (Φ Ψ : R → PROP) :
     ⊢ (∀ r, iprop(Φ r -∗ Ψ r)) -∗
       (WPi t @> H; M {{ Φ }}) -∗
       (WPi t @> H; M {{ Ψ }}) := by
-  iintro Hwand Hwp
-  -- Lost Coq step: the original proof rewrites `wpi_mask` and uses `iMod`
-  -- through fancy updates under mask `M`. The current Lean proof mode
-  -- does not yet support that.
-  sorry
+  iintro Hwand Hwp; unfold wpi_mask; imod Hwp; imodintro;
+  iapply wpi_wand_emp_mask _ _  <| λ v => iprop(|={∅,M}=> Φ v) $$ [Hwand]
+  · iintro %r HΦ; imod HΦ; imodintro; iapply Hwand $$ HΦ
+  · iexact Hwp
 
 theorem wpi_bind {A} (t : ITree E A) (k : A → ITree E R) (M : CoPset) (Φ : R → PROP) :
     ⊢ (WPi t @> H; M {{ r, WPi (k r) @> H; M {{ Φ }} }}) -∗
@@ -149,12 +145,12 @@ theorem wpi_fupd (M : CoPset) (Φ : R → PROP) :
     (WPi t @> H; M {{ v, iprop(|={M}=> Φ v) }}) ⊣⊢
     (WPi t @> H; M {{ Φ }}) := by
   isplit <;> iintro Hwp
-  · iapply wpi_wand t M <| fun v => iprop(|={M}=> Φ v)
+  · iapply wpi_wand t M <| λ v => iprop(|={M}=> Φ v)
     · iintro %r HΦ
       -- Lost Coq step: collapse `|={M}=> |={M}=> Φ r` to `|={M}=> Φ r`.
       sorry
     · iexact Hwp
-  · iapply wpi_wand t M Φ <| fun v => iprop(|={M}=> Φ v)
+  · iapply wpi_wand t M Φ <| λ v => iprop(|={M}=> Φ v)
     · iintro %r HΦ
       -- Lost Coq step: introduce `|={M}=>` around `Φ r`.
       sorry
@@ -187,8 +183,8 @@ theorem wpi_empty_mask (M : CoPset) (Φ : R → PROP) (t : ITree E R) :
     sorry
 
 theorem wpi_empty_mask_false (M : CoPset) (t : ITree E R) :
-    ⊢ (|={M, ∅}=> WPi t @> H; ∅ {{ fun _ => iprop(False) }}) -∗
-      (WPi t @> H; M {{ fun _ => iprop(False) }}) := by
+    ⊢ (|={M, ∅}=> WPi t @> H; ∅ {{ λ _ => iprop(False) }}) -∗
+      (WPi t @> H; M {{ λ _ => iprop(False) }}) := by
   iintro Hwp
   -- Lost Coq step: after clearing the mask we still need to normalize
   -- `|={∅, M}=> False` back to `False`, which again requires fancy-update
@@ -237,7 +233,7 @@ theorem wpi_ret {R} (M : CoPset) (Φ : R → PROP) (r : R) :
   sorry
 
 theorem wpi_tau {R} (M : CoPset) (Φ : R → PROP) (t : ITree E R) :
-    (WPi t @> H; M {{ fun v => Φ v }}) ⊣⊢
+    (WPi t @> H; M {{ λ v => Φ v }}) ⊣⊢
     (WPi (tau t) @> H; M {{ Φ }}) := by
   -- Lost Coq step: the original proof rewrites `wpi_mask` and then uses
   -- the unmasked `wpi_tau_emp_mask`.
@@ -245,8 +241,8 @@ theorem wpi_tau {R} (M : CoPset) (Φ : R → PROP) (t : ITree E R) :
 
 theorem wpi_vis' {R} (M : CoPset) (Φ : R → PROP) (i : E.I) (k : E.O i → ITree E R) :
     (|={M, ∅}=> H.ihandle i
-      (fun a => WPi (k a) @> H; ∅ {{ v, iprop(|={∅, M}=> Φ v) }})
-      (fun a => WPi (k a) @> H; CoPset.full {{ fun _ => iprop(False) }})) ⊣⊢
+      (λ a => WPi (k a) @> H; ∅ {{ v, iprop(|={∅, M}=> Φ v) }})
+      (λ a => WPi (k a) @> H; CoPset.full {{ λ _ => iprop(False) }})) ⊣⊢
     (WPi (vis i k) @> H; M {{ Φ }}) := by
   -- Lost Coq step: the original proof relies on `iMod`/`iModIntro` with
   -- fancy updates and an `ihandle_mono` transport.
@@ -254,16 +250,16 @@ theorem wpi_vis' {R} (M : CoPset) (Φ : R → PROP) (i : E.I) (k : E.O i → ITr
 
 theorem wpi_vis {R} (M : CoPset) (Φ : R → PROP) (i : E.I) (k : E.O i → ITree E R) :
     ⊢ (|={M, ∅}=> H.ihandle i
-      (fun a => WPi (k a) @> H; ∅ {{ v, iprop(|={∅, M}=> Φ v) }})
-      (fun a => WPi (k a) @> H; CoPset.full {{ fun _ => iprop(False) }})) -∗
+      (λ a => WPi (k a) @> H; ∅ {{ v, iprop(|={∅, M}=> Φ v) }})
+      (λ a => WPi (k a) @> H; CoPset.full {{ λ _ => iprop(False) }})) -∗
       (WPi (vis i k) @> H; M {{ Φ }}) := by
   iintro HH; iapply (wpi_vis' M Φ i k).mp $$ HH
 
 theorem wpi_trigger {E'} [E' -< E] (H' : IHandler (PROP := PROP) E') [InH H' H]
     (M : CoPset) (i : E'.I) (Φ : E'.O i → PROP) :
     ⊢ (|={M, ∅}=> H'.ihandle i
-      (fun a => iprop(|={∅, M}=> Φ a))
-      (fun _ => iprop(False))) -∗
+      (λ a => iprop(|={∅, M}=> Φ a))
+      (λ _ => iprop(False))) -∗
       (WPi (ITree.trigger E' i) @> H; M {{ Φ }}) := by
   iintro HH
   -- Lost Coq step: this proof depends on the masked `wpi_vis` rule together

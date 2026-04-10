@@ -62,15 +62,15 @@ theorem wpiF'_mono {R} (wp1 wp2 : LeibnizO (ITree E R) × (R → PROP) → PROP)
   cases t' with | mk t =>
     simp only
     iapply wpiF_mono (wp1 := λ t Φ => wp1 ({ car := t }, Φ)) (wp2 := λ t Φ => wp2 ({ car := t }, Φ))
-    . iintro !> %t' %Φ' Hw; iapply Hwand $$ %⟨t'⟩ %Φ' Hw
-    . iexact Hwp
+    · iintro !> %t' %Φ' Hw; iapply Hwand $$ %⟨t'⟩ %Φ' Hw
+    · iexact Hwp
 /-- End of Helper -/
 
 instance {R} : BIMonoPred (λ wp_itree : LeibnizO (ITree E R) × (R → PROP) → PROP => wpiF' H wp_itree) where
   mono_pred := by
     iintro %Φ %Ψ %HΦ %HΨ #H %pair Hsim; iapply wpiF'_mono
-    . iintro !> %t %Φ1; iapply H
-    . iexact Hsim
+    · iintro !> %t %Φ1; iapply H
+    · iexact Hsim
   mono_pred_ne := by
     intro wp Hwp; constructor; intro n ⟨t1, Ψ1⟩ ⟨t2, Ψ2⟩ ⟨Ht, HΨ⟩
     simp at Ht HΨ; subst Ht
@@ -234,31 +234,31 @@ theorem wpi_upd_wand_emp_mask (Φ Ψ : R → PROP) :
   let G : ITree E R → (R → PROP) → PROP :=
     λ t Φ => iprop(∀ (Ψ : R → PROP), (∀ r, iprop((|={∅}=> Φ r) -∗ (|={∅}=> Ψ r))) -∗ (WPi t @> H {{ Ψ }}))
   iapply wpi_iter_emp_mask' H G $$ [] [] [] [Hwp] [Hwand]
-  . -- Prove G t is non-expansive
+  · -- Prove G t is non-expansive
     intro t; constructor; intro n Φ₁ Φ₂ HΦ; simp [G];
     apply forall_ne; intro Ψ; refine wand_ne.ne ?_ .rfl
     apply forall_ne; intro r
     exact wand_ne.ne (BIFUpdate.ne.ne (HΦ r)) .rfl
-  . -- Case ret r
+  · -- Case ret r
     iintro !> %Φ %r HΦr; simp [G]
     iintro %Ψ Hr; iapply wpi_ret_emp_mask'; iapply Hr $$ HΦr
-  . -- Case tau t'
+  · -- Case tau t'
     iintro !> %Φ %t' HG; simp [G]
     iintro %Ψ Hwand; iapply wpi_tau_emp_mask; iapply wpi_update_emp_mask
     imod HG; imodintro; iapply HG $$ %Ψ Hwand
-  . -- Case vis i k
+  · -- Case vis i k
     iintro !> %Φ %i %k HG; simp[G]
     iintro %Ψ Hwand; iapply wpi_vis_emp_mask'
     imod HG; imodintro
     iapply H.ihandle_mono i
       (λ a => iprop(∀ Ψ, (∀ r, iprop((|={∅}=> Φ r) -∗ (|={∅}=> Ψ r))) -∗ wpi H (k a) Ψ))
       _ (λ a => iprop(|={⊤,∅}=> G (k a) (λ _ => iprop(False)))) _ $$ [Hwand] [] [HG]
-    . iintro %x HG; iapply HG $$ %Ψ Hwand
-    . imodintro; iintro %x HG; imod HG; imodintro; iapply HG
+    · iintro %x HG; iapply HG $$ %Ψ Hwand
+    · imodintro; iintro %x HG; imod HG; imodintro; iapply HG
       iintro %r Hfalse; iexact Hfalse
-    . iexact HG
-  . iexact Hwp
-  . iexact Hwand
+    · iexact HG
+  · iexact Hwp
+  · iexact Hwand
 
 theorem wpi_wand_emp_mask (Φ Ψ : R → PROP) :
     ⊢ (∀ r, iprop(Φ r -∗ Ψ r)) -∗
@@ -266,19 +266,19 @@ theorem wpi_wand_emp_mask (Φ Ψ : R → PROP) :
       (WPi t @> H {{ Ψ }}) := by
   iintro Hwand Hwp
   iapply wpi_upd_wand_emp_mask H t Φ Ψ $$ [Hwand]
-  . iintro %r HΦ; imod HΦ; imodintro; iapply Hwand $$ HΦ
-  . iexact Hwp
+  · iintro %r HΦ; imod HΦ; imodintro; iapply Hwand $$ HΦ
+  · iexact Hwp
 
 theorem wpi_update_post_emp_mask :
     (WPi t @> H {{ v, iprop(|={∅}=> Φ v) }}) ⊣⊢
     (WPi t @> H {{ Φ }}) := by
   isplit <;> iintro Hwp
   · iapply wpi_upd_wand_emp_mask H t (λ v => iprop(|={∅}=> Φ v)) Φ
-    . iintro %r Hidem; iapply fupd_idem.mp; iexact Hidem
-    . iexact Hwp
-  . iapply wpi_upd_wand_emp_mask H t Φ <| λ v => iprop(|={∅}=> Φ v)
-    . iintro %r HΦr; imodintro; iexact HΦr
-    . iexact Hwp
+    · iintro %r Hidem; iapply fupd_idem.mp; iexact Hidem
+    · iexact Hwp
+  · iapply wpi_upd_wand_emp_mask H t Φ <| λ v => iprop(|={∅}=> Φ v)
+    · iintro %r HΦr; imodintro; iexact HΦr
+    · iexact Hwp
 
 theorem wpi_bind_emp_mask {R T} (t : ITree E T) (k : T → ITree E R) (Φ : R → PROP) :
     ⊢ (WPi t @> H {{ r, WPi (k r) @> H {{ Φ }} }}) -∗
@@ -287,31 +287,31 @@ theorem wpi_bind_emp_mask {R T} (t : ITree E T) (k : T → ITree E R) (Φ : R �
   let G : ITree E T → (T → PROP) → PROP :=
     λ t Φ => iprop(∀ (Ψ : R → PROP) k', (∀ x, Φ x -∗ wpi H (k' x) Ψ) -∗ wpi H (t >>= k') Ψ)
   iapply wpi_iter_emp_mask' H G $$ [] [] [] [Hwp]
-  . -- Prove G t is non-expansive
+  · -- Prove G t is non-expansive
     intro t; constructor; intro n Φ₁ Φ₂ HΦ; simp [G]
     apply forall_ne; intro Ψ; apply forall_ne; intro k'
     refine wand_ne.ne ?_ .rfl
     apply forall_ne; intro x; exact wand_ne.ne (HΦ x) .rfl
-  . -- Case ret r
+  · -- Case ret r
     iintro !> %Φ %r Hwand; simp [G]
     iintro %Ψ %k' HG;
     have hb : ret r >>= k' = k' r := itree_ret_bind r k'; rw [hb];
     iapply wpi_update_emp_mask; imod Hwand; imodintro; iapply HG $$ Hwand
-  . -- Case tau t'
+  · -- Case tau t'
     iintro !> %Φ %t' Hwand; simp [G]
     iintro %Ψ %k' Hk; iapply wpi_tau_emp_mask
     iapply wpi_update_emp_mask; imod Hwand; imodintro; iapply Hwand $$ Hk
-  . -- Case vis i k
+  · -- Case vis i k
     iintro !> %Φ %i %k Hwand; simp [G]
     iintro %Ψ %k' Hk'; iapply wpi_vis_emp_mask'; imod Hwand; imodintro
     iapply H.ihandle_mono i (λ a => iprop(∀ Ψ k', (∀ x, Φ x -∗ wpi H (k' x) Ψ) -∗ wpi H (k a >>= k') Ψ)) _
       <| λ a => iprop(|={⊤,∅}=> ∀ Ψ k', (∀ x, False -∗ wpi H (k' x) Ψ) -∗ wpi H (k a >>= k') Ψ) $$ [Hk']
-    . iintro %a Hwand; iapply Hwand $$ Hk'
-    . iintro !> %a Hwand; imod Hwand; imodintro; iapply Hwand;
+    · iintro %a Hwand; iapply Hwand $$ Hk'
+    · iintro !> %a Hwand; imod Hwand; imodintro; iapply Hwand;
       iintro %x Hfalse; iexfalso; iexact Hfalse
-    . iexact Hwand
-  . iexact Hwp
-  . iintro %x Hwp; iexact Hwp
+    · iexact Hwand
+  · iexact Hwp
+  · iintro %x Hwp; iexact Hwp
 
 end wp_itree_derived
 
@@ -328,15 +328,15 @@ theorem wpi_frame_l_emp_mask (P : PROP) :
       (WPi t @> H {{ v, iprop(P ∗ Φ v) }}) := by
   iintro ⟨Hp, Hwp⟩
   iapply wpi_wand_emp_mask H t Φ $$ [Hp]
-  . iintro %r Hr; isplitl [Hp]; iexact Hp; iexact Hr
-  . iexact Hwp
+  · iintro %r Hr; isplitl [Hp]; iexact Hp; iexact Hr
+  · iexact Hwp
 
 theorem wpi_frame_r_emp_mask (P : PROP) :
     ⊢ (WPi t @> H {{ Φ }}) ∗ P -∗
       (WPi t @> H {{ v, iprop(Φ v ∗ P) }}) := by
   iintro ⟨Hwp, Hp⟩
   iapply wpi_wand_emp_mask H t Φ $$ [Hp]
-  . iintro %r Hr; isplitl [Hr]; iexact Hr; iexact Hp
-  . iexact Hwp
+  · iintro %r Hr; isplitl [Hr]; iexact Hr; iexact Hp
+  · iexact Hwp
 
 end wp_itree_structural

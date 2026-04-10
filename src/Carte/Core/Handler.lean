@@ -31,10 +31,10 @@ instance {PROP E} [BI PROP] (H : IHandler (PROP := PROP) E) (i : E.I) :
   intro n Φ₁ Φ₂ HΦ s₁ s₂ Hs
   have Hmon : ∀ Φ s, H.ihandle i Φ s ≡ iprop(∃ Φ' s', (∀ a, Φ' a -∗ Φ a) ∗ □ (∀ a, s' a -∗ s a) ∗ H.ihandle i Φ' s') := by
     iintro %Φ %s; isplit
-    . iintro Hwand; iexists Φ, s; isplitr;
-      . iintro %a H; iexact H
-      . isplitr; imodintro; iintro %a H; iexact H; iexact Hwand
-    . iintro ⟨%Φ', ⟨%s', ⟨HmonΦ, ⟨Hmons, HH⟩⟩⟩⟩
+    · iintro Hwand; iexists Φ, s; isplitr;
+      · iintro %a H; iexact H
+      · isplitr; imodintro; iintro %a H; iexact H; iexact Hwand
+    · iintro ⟨%Φ', ⟨%s', ⟨HmonΦ, ⟨Hmons, HH⟩⟩⟩⟩
       iapply H.ihandle_mono $$ HmonΦ Hmons HH
   apply (Hmon Φ₁ s₁).dist.trans
   apply ((exists_ne fun Φ' => ?_)).trans (Hmon Φ₂ s₂).dist.symm
