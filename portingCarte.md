@@ -47,12 +47,12 @@ The `islaris` folder should not be ported, all filenames below are relative to t
   - `halt_ifn` and corresponding adequacy: part of trace based adequacy, should not be ported
   - `haltEH`: part of itree library
   - [ ] exec adequacy
-- [ ] `handler.v`
-  - [ ] `iHandler`
-  - [ ] `sumH`
-  - [ ] `inH`
-  - [ ] `wandH` (unclear if necessary)
-  - [ ] `Sequential`
+- [x] `handler.v`
+  - [x] `iHandler`
+  - [x] `sumH`
+  - [x] `inH`
+  - [x] `wandH` (unclear if necessary)
+  - [x] `Sequential`
 - [ ] `heap.v`
   - `store`, ... functions part of itree library
   - [ ] `heapGS` and pointsto
@@ -78,7 +78,7 @@ The `islaris` folder should not be ported, all filenames below are relative to t
   - `ub_ifn`, `interp_tr_ub` and corresponding adequacy: part of trace based adequacy, should not be ported
   - `ubEH`: part of the itree library
   - [ ] exec adequacy
-- [ ] `void.v`
+- [x] `void.v`
   - `voidE`: should be given by the itree library
   - the rest of the file is not necessary to port
 - [ ] `wpi.v`
@@ -88,7 +88,7 @@ The `islaris` folder should not be ported, all filenames below are relative to t
   - [x] Lemmas and Notation about `wpi_mask` (eqit can become =)
     - [ ] invariant related (need `inv` and `iinv`)
     - [x] others
-  - [ ] `wpi_translation`: might be nice to have but unclear if necessary
+  - [x] `wpi_translation`: might be nice to have but unclear if necessary
   - [ ] `inH`
   - tactics: unclear if necessary
 
