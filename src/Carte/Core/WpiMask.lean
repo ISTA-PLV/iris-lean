@@ -290,3 +290,145 @@ theorem wpi_frame_r (M : CoPset) (P : PROP) :
   · iexact Hwp
 
 end wp_itree_structural
+
+section wp_itree_translation
+
+open ITree BIUpdate OFE
+
+-- `f` can interpret each event `E1` as an `itree E2 E1.I`, as a way to
+-- "translate" from events `E1` to `E2`
+variable {E1 E2 : Effect} {PROP : Type _} [BI PROP] [BIFUpdate PROP]
+  {H1 : IHandler (PROP := PROP) E1} {H2 : IHandler (PROP := PROP) E2}
+  (f : (i : E1.I) → ITree E2 (E1.O i))
+
+/-- Translate a WPi proof across handlers by interpreting each `E₁` event as an `E₂` itree. -/
+theorem wpi_translation_emp_mask {R} (t : ITree E1 R) (Φ : R → PROP) :
+    □ (∀ i (k : E1.O i → ITree E1 R) Ψ,
+      H1.ihandle i
+        (λ a => WPi (ITree.interp f (k a)) @> H2; ∅ {{ Ψ }})
+        (λ a => iprop(|={⊤,∅}=> WPi (ITree.interp f (k a)) @> H2; ∅ {{ λ _ => iprop(False) }})) -∗
+      (WPi (f i >>= λ a => ITree.interp f (k a)) @> H2; ∅ {{ Ψ }})) ⊢
+    (WPi t @> H1; ∅ {{ Φ }}) -∗
+    (WPi (ITree.interp f t) @> H2; ∅ {{ Φ }}) := by
+  iintro #HH Hwp
+  let G : ITree E1 R → (R → PROP) → PROP := λ t Φ => WPi (ITree.interp f t) @> H2; ∅ {{Φ}}
+  iapply (wpi_iter' G) $$ [] [] [] Hwp
+  · intro t; apply wpi_ne (interp f t)
+  · iintro !> %Φ %r Hret; simp [G, interp_ret];
+    iapply wpi_ret' $$ Hret
+  · iintro !> %Φ %t Htau; simp [G, interp_tau]
+    iapply (wpi_tau ∅ Φ <| interp f t).1; iapply wpi_empty_mask_equiv
+    iapply wpi_update_emp_mask; imod Htau; imodintro;
+    iapply wpi_empty_mask_equiv; iexact Htau
+  · iintro !> %Φ %i %k Hvis; simp[G, interp_vis];
+    iapply fupd_wpi; imod Hvis; imodintro
+    iapply HH $$ Hvis
+
+theorem wpi_translation {R} (t : ITree E1 R) (M : CoPset) (Φ : R → PROP) :
+    □ (∀ i (k : E1.O i → ITree E1 R) Ψ,
+      H1.ihandle i
+        (λ a => WPi (ITree.interp f (k a)) @> H2; ∅ {{ Ψ }})
+        (λ a => WPi (ITree.interp f (k a)) @> H2; ⊤ {{ λ _ => iprop(False) }}) -∗
+      (WPi (f i >>= λ a => ITree.interp f (k a)) @> H2; ∅ {{ Ψ }})) ⊢
+    (WPi t @> H1; M {{ Φ }}) -∗
+    (WPi (ITree.interp f t) @> H2; M {{ Φ }}) := by
+  iintro #Hwand Hwp
+  iapply wpi_atomic; ihave Hwp := wpi_atomic M Φ $$ Hwp; imod Hwp; imodintro
+  iapply wpi_translation_emp_mask (H1 := H1) (H2 := H2) f t <| λ v => iprop(|={∅,M}=> Φ v) $$ [] Hwp
+  iintro !> %i %k %Ψ Hh; iapply Hwand; iclear Hwand
+  iapply H1.ihandle_mono i $$ [] [] Hh
+  · iintro %a Hwp; iexact Hwp
+  · iintro !> %t Hwp; iapply wpi_atomic;
+    imod Hwp; imodintro; iapply wpi_wand $$ [] Hwp
+    iintro %r Hfalse; icases Hfalse with ⟨⟩
+
+/-- A sequential special case of `wpi_translation` with a simpler handler-side premise. -/
+theorem wpi_translation_seq {R} (t : ITree E1 R) (M : CoPset) (Φ : R → PROP) :
+    □ (∀ i ψ, H1.ihandle i (λ a => ψ a) (λ _ => iprop(True)) -∗
+        (WPi (f i) @> H2; ∅ {{ ψ }})) ⊢
+    (WPi t @> H1; M {{ Φ }}) -∗
+    (WPi (ITree.interp f t) @> H2; M {{ Φ }}) := by
+  iintro #Hwand Hwp; iapply wpi_translation $$ [] Hwp
+  iintro !> %i %k %Ψ Hh; iapply wpi_bind; iapply Hwand
+  iapply H1.ihandle_mono $$ [] [] Hh
+  · iintro %a Hwp; iexact Hwp
+  · iintro !> %t Hwp; exact true_intro
+
+end wp_itree_translation
+
+section wp_itree_mono
+
+open ITree BIUpdate OFE
+
+variable {E : Effect} {PROP : Type _} [BI PROP] [BIFUpdate PROP]
+  {H1 : IHandler (PROP := PROP) E} {H2 : IHandler (PROP := PROP) E}
+  [Hwand : WandH H1 H2]
+
+theorem wpi_wandH {R} (M : CoPset) (t : ITree E R) (Φ : R → PROP) :
+    (WPi t @> H1; M {{ Φ }}) ⊢ (WPi t @> H2; M {{ Φ }}) := by
+  -- TODO: simplify the presence of `H` once we have `irewrite` tactic
+  have H : (WPi t @> H1; M {{ Φ }}) ⊢ (WPi interp (λ i => trigger E i) t @> H2; M {{ Φ }}) := by
+    iapply wpi_translation; iintro !> %i %k %Ψ Hh
+    simp [ITree.trigger]; iapply wpi_vis; imodintro
+    iapply Hwand.is_wandH
+    iapply H1.ihandle_mono i $$ [] [] Hh
+    · iintro %a Hwp
+      iapply wpi_empty_mask_equiv; iapply wpi_update_post_emp_mask
+      iapply wpi_empty_mask_equiv; iexact Hwp
+    · iintro !> %a Hwp
+      iexact Hwp
+  simpa [interp_trigger_id] using H
+
+end wp_itree_mono
+
+section wp_itree_inH
+
+open ITree BIUpdate OFE
+
+variable {E1 E2 : Effect} {PROP : Type _} [BI PROP] [BIFUpdate PROP]
+  {H1 : IHandler (PROP := PROP) E1} {H2 : IHandler (PROP := PROP) E2}
+  [sub : E1 -< E2] [Hin : InH H1 H2]
+
+theorem wpi_inH_emp_mask {R} (t : ITree E1 R) (Φ : R → PROP) :
+    (WPi t @> H1; ∅ {{ Φ }}) ⊣⊢
+    (WPi (ITree.interp (fun i => ITree.trigger E1 i) t) @> H2; ∅ {{ Φ }}) := by
+  isplit
+  · iintro Hwp; iapply wpi_translation $$ [] Hwp
+    iintro !> %i %k %Ψ Hh; simp [ITree.trigger]
+    iapply wpi_vis; imodintro
+    have hIn :
+        H1.ihandle i
+          (λ a => WPi interp (λ i => vis (Subeffect.map i).fst λ x =>
+            Pure.pure ((Subeffect.map i).snd x)) (k a) @> H2; ∅ {{ λ v => iprop(|={∅}=> Ψ v) }})
+          (λ a => WPi interp (λ i => vis (Subeffect.map i).fst λ x =>
+            Pure.pure ((Subeffect.map i).snd x)) (k a) @> H2; ⊤ {{ λ _ => iprop(False) }}) ⊢
+        H2.ihandle (Subeffect.map i).fst
+          (λ a => WPi interp (λ i => vis (Subeffect.map i).fst λ x =>
+            Pure.pure ((Subeffect.map i).snd x)) (k ((Subeffect.map i).snd a)) @> H2; ∅ {{ λ v => iprop(|={∅}=> Ψ v) }})
+          (λ a => WPi interp (λ i => vis (Subeffect.map i).fst λ x =>
+            Pure.pure ((Subeffect.map i).snd x)) (k ((Subeffect.map i).snd a)) @> H2; ⊤ {{ λ _ => iprop(False) }}) := by
+      simpa using ((InH.is_inH (H1 := H1) (H2 := H2) i
+        (λ a => WPi interp (λ i => vis (Subeffect.map i).fst λ x =>
+          Pure.pure ((Subeffect.map i).snd x)) (k a) @> H2; ∅ {{ λ v => iprop(|={∅}=> Ψ v) }})
+        (λ a => WPi interp (λ i => vis (Subeffect.map i).fst λ x =>
+          Pure.pure ((Subeffect.map i).snd x)) (k a) @> H2; ⊤ {{ λ _ => iprop(False) }})).mp)
+    iapply hIn
+    iapply H1.ihandle_mono i $$ [] [] Hh
+    · iintro %a Hwp
+      iapply wpi_empty_mask_equiv
+      iapply wpi_update_post_emp_mask
+      iapply wpi_empty_mask_equiv
+      iexact Hwp
+    · iintro !> %a Hwp
+      iexact Hwp
+  · sorry
+
+theorem wpi_inH {R} (t : ITree E1 R) (M : CoPset) (Φ : R → PROP) :
+    (WPi t @> H1; M {{ Φ }}) ⊣⊢
+    (WPi (ITree.interp (fun i => ITree.trigger E1 i) t) @> H2; M {{ Φ }}) := by
+  isplit <;> (
+    iintro Hwp; iapply wpi_atomic; ihave Hwp := wpi_atomic M Φ _ $$ Hwp
+    imod Hwp; imodintro; iapply wpi_inH_emp_mask $$ Hwp
+  )
+
+end wp_itree_inH
