@@ -35,4 +35,28 @@ theorem interp_trigger_id (t : ITree E R) :
         funext o
         exact ih (k o)
 
+section interp_inverse
+
+theorem interp_ret_inv {E1 E2 R} [sub : E1 -< E2] {t : ITree E1 R} {r : R} :
+    ITree.interp (λ i => (ITree.trigger E1 i : ITree E2 (E1.O i))) t = ret r →
+    t = ret r := by
+  sorry
+
+theorem interp_tau_inv {E1 E2 R} [sub : E1 -< E2] {t : ITree E1 R} {u : ITree E2 R} :
+    ITree.interp (λ i => (ITree.trigger E1 i : ITree E2 (E1.O i))) t = tau u →
+    ∃ t', t = tau t' ∧ ITree.interp (λ i => (ITree.trigger E1 i : ITree E2 (E1.O i))) t' = u := by
+  sorry
+
+theorem interp_vis_inv {E1 E2 R} [sub : E1 -< E2] {t : ITree E1 R} {i : E2.I} {k : E2.O i → ITree E2 R} :
+    ITree.interp (λ i => (ITree.trigger E1 i : ITree E2 (E1.O i))) t = vis i k →
+    ∃ (i' : E1.I) (k' : E1.O i' → ITree E1 R),
+      t = vis i' k' ∧
+      i = (sub.map i').fst ∧
+      HEq k
+        (λ x => ITree.interp (λ i => (ITree.trigger E1 i : ITree E2 (E1.O i)))
+          (k' ((sub.map i').snd x))) := by
+  sorry
+
+end interp_inverse
+
 end ITree

@@ -1,8 +1,9 @@
 # Status of the Program Logics a la Carte port
 
-This file describes the state of the Program Logics a la Carte port relative to the Rocq implementation. The original implementation is here: https://gitlab.mpi-sws.org/iris/itree-program-logic/-/tree/master?ref_type=heads
+This file describes the state of the Program Logics a la Carte port relative to the Rocq implementation. The original implementation is here: <https://gitlab.mpi-sws.org/iris/itree-program-logic/-/tree/master?ref_type=heads>
 
 Not everything should be ported to Lean. In particular, the following parts should **not** be ported:
+
 - The trace-based adequacy
 - The executable interpreters (this is subsumed by the interpreters given by the coinductive library)
 - The itree semantics for HeapLang (these are already provided by the coinductive library)
@@ -15,6 +16,7 @@ Not everything should be ported to Lean. In particular, the following parts shou
 The `islaris` folder should not be ported, all filenames below are relative to the `src` folder.
 
 ## `src`
+
 - [ ] `angelic_choice.v`
   - `angelicE`: part of itree library
   - [ ] `angelicH`
@@ -89,10 +91,11 @@ The `islaris` folder should not be ported, all filenames below are relative to t
     - [ ] invariant related (need `inv` and `iinv`)
     - [x] others
   - [x] `wpi_translation`: might be nice to have but unclear if necessary
-  - [ ] `inH`
+  - [x] `inH`
   - tactics: unclear if necessary
 
 ## `src/threadpool`
+
 - `ctrace.v`: part of trace based adequacy, should not be ported
 - [ ] `exec.v`:
   - `threadpoolEH`: part of itree library (`concEH`)

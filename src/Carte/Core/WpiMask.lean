@@ -385,43 +385,53 @@ section wp_itree_inH
 
 open ITree BIUpdate OFE
 
-variable {E1 E2 : Effect} {PROP : Type _} [BI PROP] [BIFUpdate PROP]
+variable {E1 E2 : Effect} {PROP : Type _} [BI PROP] [BIFUpdate PROP] [BIAffine PROP]
   {H1 : IHandler (PROP := PROP) E1} {H2 : IHandler (PROP := PROP) E2}
   [sub : E1 -< E2] [Hin : InH H1 H2]
 
 theorem wpi_inH_emp_mask {R} (t : ITree E1 R) (Φ : R → PROP) :
     (WPi t @> H1; ∅ {{ Φ }}) ⊣⊢
-    (WPi (ITree.interp (fun i => ITree.trigger E1 i) t) @> H2; ∅ {{ Φ }}) := by
-  isplit
-  · iintro Hwp; iapply wpi_translation $$ [] Hwp
+    (WPi (ITree.interp (λ i => ITree.trigger E1 i) t) @> H2; ∅ {{ Φ }}) := by
+  isplit <;> iintro Hwp
+  · iapply wpi_translation $$ [] Hwp
     iintro !> %i %k %Ψ Hh; simp [ITree.trigger]
     iapply wpi_vis; imodintro
-    have hIn :
-        H1.ihandle i
-          (λ a => WPi interp (λ i => vis (Subeffect.map i).fst λ x =>
-            Pure.pure ((Subeffect.map i).snd x)) (k a) @> H2; ∅ {{ λ v => iprop(|={∅}=> Ψ v) }})
-          (λ a => WPi interp (λ i => vis (Subeffect.map i).fst λ x =>
-            Pure.pure ((Subeffect.map i).snd x)) (k a) @> H2; ⊤ {{ λ _ => iprop(False) }}) ⊢
-        H2.ihandle (Subeffect.map i).fst
-          (λ a => WPi interp (λ i => vis (Subeffect.map i).fst λ x =>
-            Pure.pure ((Subeffect.map i).snd x)) (k ((Subeffect.map i).snd a)) @> H2; ∅ {{ λ v => iprop(|={∅}=> Ψ v) }})
-          (λ a => WPi interp (λ i => vis (Subeffect.map i).fst λ x =>
-            Pure.pure ((Subeffect.map i).snd x)) (k ((Subeffect.map i).snd a)) @> H2; ⊤ {{ λ _ => iprop(False) }}) := by
-      simpa using ((InH.is_inH (H1 := H1) (H2 := H2) i
-        (λ a => WPi interp (λ i => vis (Subeffect.map i).fst λ x =>
-          Pure.pure ((Subeffect.map i).snd x)) (k a) @> H2; ∅ {{ λ v => iprop(|={∅}=> Ψ v) }})
-        (λ a => WPi interp (λ i => vis (Subeffect.map i).fst λ x =>
-          Pure.pure ((Subeffect.map i).snd x)) (k a) @> H2; ⊤ {{ λ _ => iprop(False) }})).mp)
-    iapply hIn
+    iapply Hin.is_inH i
+      (λ a => WPi interp (λ i => vis (Subeffect.map i).fst λ x =>
+        Pure.pure ((Subeffect.map i).snd x)) (k a) @> H2; ∅ {{ v, iprop(|={∅}=> Ψ v) }})
+      (λ a => WPi interp (λ i => vis (Subeffect.map i).fst λ x =>
+          Pure.pure ((Subeffect.map i).snd x)) (k a) @> H2; ⊤ {{ λ _ => iprop(False) }})
     iapply H1.ihandle_mono i $$ [] [] Hh
-    · iintro %a Hwp
-      iapply wpi_empty_mask_equiv
-      iapply wpi_update_post_emp_mask
-      iapply wpi_empty_mask_equiv
+    · iintro %a Hwp; iapply wpi_empty_mask_equiv
+      iapply wpi_update_post_emp_mask; iapply wpi_empty_mask_equiv
       iexact Hwp
-    · iintro !> %a Hwp
-      iexact Hwp
-  · sorry
+    · iintro !> %a Hwp; iexact Hwp
+  · let emb : (i : E1.I) → ITree E2 (E1.O i) := fun i => ITree.trigger E1 i
+    let G : ITree E2 R → (R → PROP) → PROP := λ u Ψ =>
+      iprop(∀ t', ⌜ITree.interp emb t' = u⌝ -∗ (WPi t' @> H1; ∅ {{ Ψ }}))
+    ihave Hgen : (∀ u Ψ, (WPi u @> H2; ∅ {{ Ψ }}) -∗ G u Ψ) $$ []
+    · iapply wpi_iter' G
+      · intro u; constructor; intro n Ψ₁ Ψ₂ HΨ
+        simp [G]; apply forall_ne; intro t'
+        exact wand_ne.ne .rfl <| (wpi_mask_ne ∅ H1 t').ne HΨ
+      · iintro !> %Ψ %r HΦ; simp [G]; iintro %t' %Heq
+        iapply fupd_wpi; imod HΦ; imodintro
+        have Heq' := interp_ret_inv Heq; subst Heq'
+        iapply wpi_ret $$ HΦ
+      · iintro !> %Ψ %u Hu; simp [G]; iintro %t' %Heq
+        iapply fupd_wpi; imod Hu; imodintro
+        rcases interp_tau_inv Heq with ⟨t1, rfl, Heq1⟩
+        iapply wpi_tau ∅ Ψ t1; iapply Hu $$ %t1 %Heq1
+      · iintro !> %Ψ %i %k Hik; simp [G]; iintro %t' %Heq
+        rcases interp_vis_inv Heq with ⟨i', k', Ht', Hi, Hk⟩
+        subst Ht'; iapply wpi_vis; imod Hik; imodintro
+        iapply Hin.is_inH; subst Hi;
+        iapply H2.ihandle_mono (Subeffect.map i').fst $$ [] [] Hik
+        · iintro %a HG; iapply wpi_fupd; iapply HG;
+          ipure_intro; subst Hk; rfl
+        · iintro !> %a HG; iapply wpi_atomic_false; iapply HG
+          ipure_intro; subst Hk; rfl
+    iapply Hgen $$ Hwp %t %rfl
 
 theorem wpi_inH {R} (t : ITree E1 R) (M : CoPset) (Φ : R → PROP) :
     (WPi t @> H1; M {{ Φ }}) ⊣⊢
