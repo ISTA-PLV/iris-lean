@@ -19,8 +19,8 @@ The `islaris` folder should not be ported, all filenames below are relative to t
 
 - [ ] `angelic_choice.v`
   - `angelicE`: part of itree library
-  - [ ] `angelicH`
-  - [ ] wpi rules
+  - [x] `angelicH`
+  - [x] wpi rules
   - `angelicEH`: part of itree library
   - [ ] exec adequacy
 - `axioms.v`: not necessary in Lean
@@ -33,8 +33,8 @@ The `islaris` folder should not be ported, all filenames below are relative to t
   - `demonicEH`: should be given by the itree library
   - [ ] exec adequacy
 - [ ] `exec.v`
-  - [ ] `bi_close`
-  - [ ] `bi_mono0`
+  - [x] `bi_close`
+  - [x] `bi_mono0`
   - [ ] `lfp_tp`
   - `eHandler`, `seHandler`, `inEH`, `exec`: provided by the itree library
   - [ ] `(s)eHandlerAdequate`
@@ -75,11 +75,11 @@ The `islaris` folder should not be ported, all filenames below are relative to t
 - `trace.v`: not ported
 - [ ] `ub.v`
   - `ubE`: part of the itree library (called `failE`)
-  - [ ] `ubH`
-  - [ ] wpi rules
+  - [x] `ubH`
+  - [ ] wpi rules (`wpi_fail` sorry)
   - `ub_ifn`, `interp_tr_ub` and corresponding adequacy: part of trace based adequacy, should not be ported
   - `ubEH`: part of the itree library
-  - [ ] exec adequacy
+  - [x] exec adequacy
 - [x] `void.v`
   - `voidE`: should be given by the itree library
   - the rest of the file is not necessary to port

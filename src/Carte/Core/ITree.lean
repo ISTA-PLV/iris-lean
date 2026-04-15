@@ -6,6 +6,11 @@ open ITree
 
 variable {E R} (t : ITree E R)
 
+theorem bind_ret (t : ITree E R) :
+  t >>= (fun x => ITree.ret x) = t := by
+  simpa [Functor.map, pure]
+    using (id_map (f := ITree E) (x := t))
+
 theorem match_itree : ∀ (t : ITree E R),
     (∃ r, t = ret r) ∨ (∃ t', t = tau t') ∨ (∃ i k, t = vis i k) := by
   intro t
