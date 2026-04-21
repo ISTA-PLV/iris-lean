@@ -1,0 +1,9 @@
+name = "carte"
+defaultTargets = ["Carte"]
+
+[[require]]
+name = "iris"
+path = "../Iris"
+
+[[lean_lib]]
+name = "Carte"
