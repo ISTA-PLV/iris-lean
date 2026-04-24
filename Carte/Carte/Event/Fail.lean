@@ -1,6 +1,10 @@
-import Carte.Core.Handler
-import Carte.Core.WpiMask
-import ITree
+module
+
+public import Carte.Core.HandlerAdequate
+public import Carte.Core.WpiMask
+public import ITree
+
+@[expose] public section
 
 namespace Carte.Event
 
@@ -63,41 +67,35 @@ end wpi_rules
 
 section exec
 
-open ITree.Exec
+open ITree.Exec Carte.Core
 
-abbrev ubEH := failEH
-
--- The Coq `seHandlerAdequate` layer does not currently exist in this Lean port.
+instance failEH_adequate {PROP : Type _} [BI PROP] [BIFUpdate PROP] :
+    SEHandlerAdequate (failH (PROP := PROP)) failEH where
+  sehandler_inv _ := iprop(True)
+  sehandler_adequate := by
+    intro i s C Φ1 Φ2 Hhandle
+    simp [failH]
+    iintro Hfalse _
+    icases Hfalse with ⟨⟩
 
 theorem exec_some_or_ub {E : Effect} {R σ : Type _}
     (EH : EHandler E E R σ) [failE -< E] [InEH failEH.toEHandler EH]
     (msg : String) (o : Option R) (s : σ) (C : ITree E R → σ → Prop) :
     (∀ x, o = some x → C (ITree.ret x) s) →
     exec EH (match o with | some x => ITree.ret x | none => FailE.fail msg) s C := by
-  intro hC
-  cases o with
-  | none =>
-      unfold FailE.fail
-      apply exec.trigger failEH.toEHandler
-      simp [failEH]
-  | some x =>
-      apply exec.stop
-      exact hC x rfl
+  intro hC; cases o with
+  | none => unfold FailE.fail; apply exec.trigger failEH.toEHandler; simp [failEH]
+  | some x => apply exec.stop; exact hC x rfl
 
 theorem exec_assert {E : Effect} {σ : Type _}
     (EH : EHandler E E PUnit σ) [failE -< E] [InEH failEH.toEHandler EH]
     (P : Prop) [Decidable P] (s : σ) (C : ITree E PUnit → σ → Prop) :
     (P → C (ITree.ret ⟨⟩) s) →
     exec EH (FailE.assert P) s C := by
-  intro hC
-  unfold FailE.assert
+  intro hC; unfold FailE.assert
   by_cases h : P
-  · simp [h]
-    apply exec.stop
-    exact hC h
-  · simp [h, FailE.fail]
-    apply exec.trigger failEH.toEHandler
-    simp [failEH]
+  · simp [h]; apply exec.stop; exact hC h
+  · simp [h, FailE.fail]; apply exec.trigger failEH.toEHandler; simp [failEH]
 
 end exec
 

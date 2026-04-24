@@ -1,85 +1,87 @@
-import Carte.Core.Handler
-import Carte.Core.WpiMask
-import ITree
+module
+
+public import Carte.Core.HandlerAdequate
+public import Carte.Core.WpiMask
+public import ITree.Effects.State
+
+@[expose] public section
 
 namespace Carte.Event
 
 open Iris BI ITree Effects
 
-class stateInterp (PROP : Type _) [BI PROP] (S : Type _) where
-  state_interp : S → PROP
-
-export stateInterp (state_interp)
-
-def get_state {S : Type _} {E : Effect} [stateE S -< E] : ITree E S :=
-  ITree.trigger (stateE S) id
-
-def set_state {S : Type _} {E : Effect} [stateE S -< E] (s' : S) : ITree E PUnit :=
-  ITree.trigger (stateE S) (fun _ => s') >>= fun _ => ITree.ITree.ret PUnit.unit
-
-section exec
-
-open ITree.Exec
-
-abbrev stateEH := ITree.Effects.stateEH
-
--- The Coq `seHandlerAdequate` layer does not currently exist in this Lean port.
-
-end exec
-
 section handler
 
 variable {PROP : Type _} [BI PROP] [BIFUpdate PROP]
 
-def stateH (S : Type _) [stateInterp PROP S] : IHandler (PROP := PROP) (stateE S) where
+def stateH {S : Type _} (state_interp : S → PROP) : IHandler (PROP := PROP) (stateE S) where
   ihandle := fun i Φ _ => iprop(∀ s, state_interp s ={∅}=∗ state_interp (i s) ∗ Φ s)
   ihandle_mono := by
     iintro %i %Φ %Φ' %s %s' HΦwand #Hswand HH
-    iintro %st Hst
-    ihave Hstep := HH $$ Hst
-    imod Hstep
-    imodintro
-    icases Hstep with ⟨Hst, HΦ⟩
+    iintro %st Hst; ispecialize HH $$ Hst
+    imod HH; imodintro; icases HH with ⟨Hst, HΦ⟩
     isplitl [Hst]
     · iexact Hst
     · iapply HΦwand $$ HΦ
 
-instance stateH_sequential (S : Type _) [stateInterp PROP S] :
-    Sequential (PROP := PROP) (stateH (PROP := PROP) S) := by
+instance stateH_sequential {S : Type _} (state_interp : S → PROP) :
+    Sequential (PROP := PROP) (stateH (PROP := PROP) state_interp) := by
   constructor
   iintro %i %Φ %s HH
-  simpa [stateH] using HH
+  simp [stateH]
 
 end handler
 
 section wpi_rules
 
-variable {PROP : Type _} [BI PROP] [BIFUpdate PROP] {S : Type _} [stateInterp PROP S]
+variable {PROP : Type _} [BI PROP] [BIFUpdate PROP] {S : Type _}
+  (state_interp : S → PROP)
   {E : Effect} {H : IHandler (PROP := PROP) E}
-  [stateE S -< E] [Hin : InH (stateH (PROP := PROP) S) H]
-
-def get_state_pre (Φ : S → PROP) : PROP :=
-  BIBase.forall (PROP := PROP) fun s : S =>
-    BIBase.wand
-      (@state_interp PROP _ S _ s)
-      (Iris.FUpd.fupd (PROP := PROP) ∅ ∅ <|
-        BIBase.sep (@state_interp PROP _ S _ s) (Φ s))
-
-def set_state_pre (s' : S) (Φ : PUnit → PROP) : PROP :=
-  BIBase.forall (PROP := PROP) fun s : S =>
-    BIBase.wand
-      (@state_interp PROP _ S _ s)
-      (Iris.FUpd.fupd (PROP := PROP) ∅ ∅ <|
-        BIBase.sep (@state_interp PROP _ S _ s') (Φ PUnit.unit))
+  [stateE S -< E] [Hin : InH (stateH (PROP := PROP) state_interp) H]
 
 theorem wpi_get_state (M : CoPset) (Φ : S → PROP) :
-    get_state_pre (PROP := PROP) (S := S) Φ ⊢
-    wpi_mask (H := H) M (get_state (S := S)) Φ := by
-  sorry
+    ⊢ (∀ s, state_interp s ={∅}=∗ state_interp s ∗ Φ s) -∗
+      wpi_mask (H := H) M (StateE.get (α := S)) Φ := by
+  let m : Σ i : E.I, E.O i → S := @Subeffect.map (stateE S) E _ (id : S → S)
+  have Hvis :
+      ⊢ (∀ s, state_interp s ={∅}=∗ state_interp s ∗ Φ s) -∗
+        (WPi
+          (ITree.vis m.1 (fun x : E.O m.1 => ITree.ret (m.2 x))) @> H; M {{ Φ }}) := by
+    iintro HΦ
+    iapply (wpi_vis (H := H) (M := M) (Φ := Φ)
+      (i := m.1)
+      (k := fun x : E.O m.1 => ITree.ret (m.2 x)))
+    iapply fupd_mask_intro
+    · exact Std.LawfulSet.empty_subset
+    · iintro Hfupd
+      let Φ1 : S → PROP := fun a =>
+        WPi ITree.ret a @> H; ∅ {{ fun v => iprop(|={∅,M}=> Φ v) }}
+      let Φ2 : S → PROP := fun a =>
+        WPi ITree.ret a @> H; ⊤ {{ fun _ => iprop(False) }}
+      have HIn :
+          (stateH (PROP := PROP) state_interp).ihandle (id : S → S) Φ1 Φ2 ⊢
+            H.ihandle m.1 (fun a => Φ1 (m.2 a)) (fun a => Φ2 (m.2 a)) := by
+        exact (Hin.is_inH (i₁ := (id : S → S)) (Φ₁ := Φ1) (s₁ := Φ2)).mp
+      iapply HIn
+      simp [stateH]
+      iintro %s Hs
+      ispecialize HΦ $$ %s Hs
+      imod HΦ
+      icases HΦ with ⟨Hs, HΦs⟩
+      imodintro
+      isplitl [Hs]
+      · iexact Hs
+      · iapply (wpi_ret' (H := H) (M := ∅)
+          (Φ := fun v => iprop(|={∅,M}=> Φ v)) (r := s)).mp
+        imodintro
+        imod Hfupd
+        imodintro
+        iexact HΦs
+  simpa [m, StateE.get, StateE.modify, ITree.trigger] using Hvis
 
-theorem wpi_set_state (s' : S) (M : CoPset) (Φ : PUnit → PROP) :
-    set_state_pre (PROP := PROP) (S := S) s' Φ ⊢
-    wpi_mask (H := H) M (set_state (S := S) s') Φ := by
+theorem wpi_set_state (st' : S) (M : CoPset) (Ψ : PUnit → PROP) :
+    ⊢ (∀ s, state_interp s ={∅}=∗ state_interp st' ∗ Ψ PUnit.unit) -∗
+      wpi_mask (H := H) M (StateE.set (α := S) st') Ψ := by
   sorry
 
 end wpi_rules

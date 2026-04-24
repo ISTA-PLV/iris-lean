@@ -1,9 +1,8 @@
-import Carte.Core.Handler
-import Carte.Core.Wpi
-import Carte.Core.Trace
-import Carte.Core.Interpreter
-import Carte.Core.Exec
+module
 
-namespace Carte.Core
-
-end Carte.Core
+public import Carte.Core.Handler
+public import Carte.Core.Wpi
+public import Carte.Core.Trace
+public import Carte.Core.Exec
+public import Carte.Core.WpiExec
+public import Carte.Core.HandlerAdequate

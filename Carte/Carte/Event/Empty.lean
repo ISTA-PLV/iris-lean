@@ -1,5 +1,9 @@
-import Carte.Core.Handler
-import ITree
+module
+
+public import Carte.Core.Handler
+public import ITree
+
+@[expose] public section
 
 namespace Carte.Event
 

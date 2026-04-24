@@ -1,6 +1,10 @@
-import Carte.Core.ITree
-import ITree.Definition
-import ITree.Effect
+module
+
+public import Carte.Core.ITree
+public import ITree.Definition
+public import ITree.Effect
+
+@[expose] public section
 
 open ITree
 

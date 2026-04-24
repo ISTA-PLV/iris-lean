@@ -1,10 +1,14 @@
-import Carte.Core.Handler
-import Carte.Core.Wpi
-import Iris.ProofMode
-import Iris.BI.Lib.Fixpoint
-import Iris.BI.BigOp.BigSepList
-import ITree.Definition
-import ITree.Exec
+module
+
+public import Carte.Core.Handler
+public import Carte.Core.Wpi
+public import Iris.ProofMode
+public import Iris.BI.Lib.Fixpoint
+public import Iris.BI.BigOp.BigSepList
+public import ITree.Definition
+public import ITree.Exec
+
+@[expose] public section
 
 namespace Carte.Core
 
@@ -45,46 +49,6 @@ theorem bi_close_respect (P : α → PROP) [Hsym : Symm R] [Htran : Trans R R R]
   · iexact HP
 
 end bi_close
-
-section handler_adequacy
-
-open ITree.Exec
-
-variable {PROP : Type _} [BI PROP] [BIFUpdate PROP]
-
-/-- Logical adequacy interface for executable handlers with thread-pool side effects. -/
-class EHandlerAdequate {E GE : Effect.{u} } {R σ : Type _}
-    (H : IHandler (PROP := PROP) E) (EH : EHandler E GE R σ) where
-  ehandler_inv : σ → List (((ITree GE R → PROP) → PROP)) → PROP
-  ehandler_adequate :
-    ∀ (G : ITree GE R → PROP) (e : E.I) (s : σ)
-      (Ms : List (((ITree GE R → PROP) → PROP)))
-      (C : ITree GE R → σ → Prop) (k : E.O e → ITree GE R),
-      EH.handle e s k C →
-      ⊢ H.ihandle e (fun a => G (k a)) (fun a => iprop(|={⊤,∅}=> G (k a))) -∗
-          ehandler_inv s Ms -∗
-          |={∅}=> ∃ t' s' M' Ms' Msn,
-            ⌜C t' s'⌝ ∗
-            ⌜(M' :: Ms').Perm (Msn ++ Ms)⌝ ∗
-            ([∗list] M ∈ Msn, M G) ∗
-            ehandler_inv s' Ms' ∗
-            bi_close Eq (fun t'' => iprop(∀ P, M' P ={∅}=∗ P t'')) t'
-  ehandler_inv_proper :
-    ∀ {s s' Ms Ms'}, s = s' → Ms = Ms' →
-      ehandler_inv s Ms ⊢ ehandler_inv s' Ms'
-
-/-- Logical adequacy interface for simple executable handlers. -/
-class SEHandlerAdequate {E : Effect.{u} } {σ : Type _}
-    (H : IHandler (PROP := PROP) E) (EH : SEHandler E σ) where
-  sehandler_inv : σ → PROP
-  sehandler_adequate :
-    ∀ (e : E.I) (s : σ) (C : E.O e → σ → Prop) (Φ1 Φ2 : E.O e → PROP),
-      EH.handle e s C →
-      ⊢ H.ihandle e Φ1 Φ2 -∗
-          sehandler_inv s -∗
-          |={∅}=> ∃ a s', ⌜C a s'⌝ ∗ sehandler_inv s' ∗ Φ1 a
-
-end handler_adequacy
 
 /-- [bi_mono0] : linear monotone closure of a predicate transformer. -/
 def bi_mono0 {PROP : Type _} [BI PROP] {α : Type _} (P : (α → PROP) → PROP) : (α → PROP) → PROP :=
@@ -295,62 +259,70 @@ theorem lfp_tp_perm (Ms1 Ms2 : List ((α → PROP) → PROP)) (h : Ms1.Perm Ms2)
 theorem lfp_tp_app (Ms1 Ms2 : List ((α → PROP) → PROP)) :
     ⊢ lfp_tp F Ms1 -∗ lfp_tp F Ms2 -∗ lfp_tp F (Ms1 ++ Ms2) := by
   letI : NonExpansive λ (Ms : LeibnizO (List ((α → PROP) → PROP))) =>
-    iprop(∀ Ms2, lfp_tp F Ms2 -∗ lfp_tp F (Ms.car ++ Ms2)) := by
-      sorry
-  have Hwrap :
-      ⊢ BI.forall (fun Ms1 : LeibnizO (List ((α → PROP) → PROP)) =>
-            iprop(lfp_tp F Ms1.car -∗ BI.forall (fun Ms2 =>
-              iprop(lfp_tp F Ms2 -∗ lfp_tp F (Ms1.car ++ Ms2))))) -∗
-          BI.forall (fun Ms1 : List ((α → PROP) → PROP) =>
-            iprop(lfp_tp F Ms1 -∗ BI.forall (fun Ms2 =>
-              iprop(lfp_tp F Ms2 -∗ lfp_tp F (Ms1 ++ Ms2))))) := by
-    iintro H %Ms1 Hx1 %Ms2 Hx2
-    iapply H $$ %⟨Ms1⟩ Hx1 %Ms2 Hx2
-  have Hwrap2 :
-      ⊢ BI.forall (fun Ms2 : LeibnizO (List ((α → PROP) → PROP)) =>
-            iprop(lfp_tp F Ms2.car -∗ BI.forall (fun Ms1 =>
-              iprop(lfp_tpF F (fun x =>
-                iprop((∀ Ms, lfp_tp F Ms -∗ lfp_tp F (x.car ++ Ms)) ∧ lfp_tp F x.car)) Ms1 -∗
-                  lfp_tp F (Ms1.car ++ Ms2.car))))) -∗
-          BI.forall (fun Ms2 : List ((α → PROP) → PROP) =>
-            iprop(lfp_tp F Ms2 -∗ BI.forall (fun Ms1 =>
-              iprop(lfp_tpF F (fun x =>
-                iprop((∀ Ms, lfp_tp F Ms -∗ lfp_tp F (x.car ++ Ms)) ∧ lfp_tp F x.car)) Ms1 -∗
-                  lfp_tp F (Ms1.car ++ Ms2))))) := by
-    iintro H %Ms2 Hx2 %Ms1 Hx1
-    iapply H $$ %⟨Ms2⟩ Hx2 %Ms1 Hx1
-  iintro Hx1 Hx2; irevert %Ms1 Hx1 %Ms2 Hx2
-  iapply Hwrap
-  iapply lfp_tp_ind F λ Ms => iprop(∀ Ms2, lfp_tp F Ms2 -∗ lfp_tp F (Ms.car ++ Ms2))
-  iintro !> %Ms1 Hx1 %Ms2 Hx2; irevert %Ms1 Hx1; irevert %Ms2 Hx2
+    iprop(∀ Ms2, lfp_tp F Ms2 -∗ lfp_tp F (Ms.car ++ Ms2)) := ⟨
+      λ n ls1 lst2 Hlst => by
+        refine forall_ne (λ Ms2 => ?_)
+        cases Hlst; rfl
+    ⟩
   letI : NonExpansive λ (Ms : LeibnizO (List ((α → PROP) → PROP))) =>
-      iprop(∀ Ms1, lfp_tpF F (λ x =>
-        iprop((∀ Ms, lfp_tp F Ms -∗ lfp_tp F (x.car ++ Ms)) ∧ lfp_tp F x.car)) Ms1 -∗
-          lfp_tp F (Ms1.car ++ Ms.car)) := ⟨
+    iprop(∀ Ms1, lfp_tpF F (λ x => iprop((∀ Ms, lfp_tp F Ms -∗ lfp_tp F (x.car ++ Ms))
+      ∧ lfp_tp F x.car)) Ms1 -∗ lfp_tp F (Ms1.car ++ Ms.car)) := ⟨
         λ n lst1 lst2 Hlst => by
           refine forall_ne (λ Ms1 => ?_)
-          cases Hlst
-          rfl
+          cases Hlst; rfl
       ⟩
-  iapply Hwrap2
+  -- TODO: Try to remove these two have statements
+  have Hwrap : ⊢ (∀ (Ms1 : LeibnizO (List ((α → PROP) → PROP))),
+    iprop(lfp_tp F Ms1.car -∗ ∀ Ms2, iprop(lfp_tp F Ms2 -∗
+      lfp_tp F (Ms1.car ++ Ms2)))) -∗
+    ∀ (Ms1 : List ((α → PROP) → PROP)), iprop(lfp_tp F Ms1 -∗
+      ∀ Ms2, iprop(lfp_tp F Ms2 -∗ lfp_tp F (Ms1 ++ Ms2))) := by
+    iintro H %Ms1 Hx1 %Ms2 Hx2
+    iapply H $$ %⟨Ms1⟩ Hx1 %Ms2 Hx2
+  have Hwrap2 : ⊢ (∀ (Ms2 : LeibnizO (List ((α → PROP) → PROP))),
+    iprop(lfp_tp F Ms2.car -∗ ∀ Ms1, iprop(lfp_tpF F (λ x =>
+      iprop((∀ Ms, lfp_tp F Ms -∗ lfp_tp F (x.car ++ Ms)) ∧ lfp_tp F x.car)) Ms1 -∗
+      lfp_tp F (Ms1.car ++ Ms2.car)))) -∗
+    ∀ (Ms2 : List ((α → PROP) → PROP)), iprop(lfp_tp F Ms2 -∗ BI.forall (λ Ms1 =>
+      iprop(lfp_tpF F (λ x => iprop((∀ Ms, lfp_tp F Ms -∗ lfp_tp F (x.car ++ Ms)) ∧
+      lfp_tp F x.car)) Ms1 -∗ lfp_tp F (Ms1.car ++ Ms2)))) := by
+    iintro H %Ms2 Hx2 %Ms1 Hx1
+    iapply H $$ %⟨Ms2⟩ Hx2 %Ms1 Hx1
+  iintro Hx1 Hx2; irevert %Ms1 Hx1 %Ms2 Hx2; iapply Hwrap; iclear %Hwrap
+  iapply lfp_tp_ind F λ Ms => iprop(∀ Ms2, lfp_tp F Ms2 -∗ lfp_tp F (Ms.car ++ Ms2))
+  iintro !> %Ms1 Hx1 %Ms2 Hx2; irevert %Ms2 Hx2 %Ms1 Hx1; iapply Hwrap2; iclear %Hwrap2
   iapply lfp_tp_ind F λ Ms => iprop(∀ Ms1, lfp_tpF F (λ x =>
     iprop((∀ Ms, lfp_tp F Ms -∗ lfp_tp F (x.car ++ Ms)) ∧ lfp_tp F x.car)) Ms1 -∗
       lfp_tp F (Ms1.car ++ Ms.car))
+  repeat clear this
   iintro !> %Ms2 Hx2 %Ms1 Hx1; iapply lfp_tp_unfold; unfold lfp_tpF at ⊢; simp
   iintro %i %M %Hi
+  -- TODO: write some lemmas for (Ms1.car ++ Ms2.car)[i]? = some M
   sorry
 
 theorem lfp_tp_cons (M : (α → PROP) → PROP) (Ms : List ((α → PROP) → PROP)) :
     ⊢ lfp_tp F [M] -∗ lfp_tp F Ms -∗ lfp_tp F (M :: Ms) := by
-  sorry
+  simpa using (lfp_tp_app F [M] Ms)
 
 theorem lfp_tp_singleton_mod_elim (M : (α → PROP) → PROP) :
     ⊢ M (λ x => lfp_tp F [λ P => P x]) -∗ lfp_tp F [M] := by
-  sorry
+  iintro Hx; iapply lfp_tp_unfold; simp only [lfp_tpF]
+  iintro %i %M' %Hi; cases i with
+  | zero =>
+    simp at Hi; subst M'; simp only [List.eraseIdx, List.append_nil]
+    iapply bi_mono0_intro M $$ Hx; iintro %x Hlfp;
+    ihave Hlfp := lfp_tp_unfold F [λ P => P x] $$ Hlfp; simp only [lfp_tpF];
+    have Hlookup : ([λ P => P x] : List ((α → PROP) → PROP))[0]? = some (λ P => P x) := by simp
+    ispecialize Hlfp $$ %0 %(λ P => P x) %Hlookup
+    simp only [List.eraseIdx, List.append_nil]
+    iapply bi_mono0_elim $$ Hlfp; iintro %Q %Q' Hwand HQ'
+    iapply Hwand $$ HQ'
+  | succ n => simp at Hi
 
 end lfp_tp_lemmas
 
-theorem lfp_tp_intro_of {PROP : Type _} [BI PROP] [BIAffine PROP]
+-- TODO: lack of tactic `iinduction`
+theorem lfp_tp_intro {PROP : Type _} [BI PROP] [BIAffine PROP]
     {α : Type _} [OFE α] [OFE.Discrete α] [OFE.Leibniz α]
     (G : (α → PROP) → (α → PROP)) [HG : BIMonoPred G] (x : α) :
     ⊢ bi_least_fixpoint G x -∗ lfp_tp G [λ P => P x] := by
@@ -359,165 +331,6 @@ theorem lfp_tp_intro_of {PROP : Type _} [BI PROP] [BIAffine PROP]
       have Heq : x1 = x2 := OFE.eq_of_eqv (OFE.Discrete.discrete Hx)
       subst Heq; rfl
   ⟩
-  irevert %x; iapply least_fixpoint_iter
-  · iintro !> %x HF
-    iapply (lfp_tp_unfold G [λ P => P x]).mpr
-    simp only [lfp_tpF]
-    iintro %i %M %Hi
-    cases i with
-    | zero =>
-      simp at Hi; subst Hi
-      simp only [bi_mono0]
-      iexists (G (fun y => lfp_tp G [λ P => P y]))
-      isplitl [HF]
-      · iexact HF
-      · iintro %y HGy
-        iexists (fun y => lfp_tp G [λ P => P y])
-        isplitl [HGy]
-        · iexact HGy
-        · iintro %Ms' HMs'
-          simp only [List.eraseIdx, List.append_nil]
-          sorry
-    | succ n => simp at Hi
-
-/-! ## Constant-Φ weakest precondition -/
-
-/-- The constant-Φ weakest precondition functional.
-    Unlike `wpiF`, the postcondition Φ is fixed rather than varying. -/
-def wpi_constF {E : Effect} {R : Type _} {PROP : Type _} [BI PROP] [BIFUpdate PROP]
-    (H : IHandler (PROP := PROP) E) (Φ : R → PROP)
-    (wpi : LeibnizO (ITree E R) → PROP) :
-    LeibnizO (ITree E R) → PROP :=
-  λ t => iprop(
-    |={∅}=> match t.car.unfold with
-    | ITreeF.ret r => Φ r
-    | ITreeF.tau t' => wpi ⟨t'⟩
-    | ITreeF.vis i k => H.ihandle i
-        (λ a => wpi ⟨k a⟩)
-        (λ a => iprop(|={⊤,∅}=> wpi ⟨k a⟩))
-  )
-
-section wp_itree_const
-
-variable {E : Effect} {R : Type _} {PROP : Type _} [BI PROP] [BIFUpdate PROP]
-
-instance wpi_constF_ne (H : IHandler (PROP := PROP) E) (Φ : R → PROP) :
-    NonExpansive (wpi_constF H Φ) where
-  ne {_ wp1 wp2} Hwp := by
-    intro t
-    cases h : t.car.unfold <;> simp [wpi_constF, h]
-    case tau t' => exact BIFUpdate.ne.ne <| Hwp ⟨t'⟩
-    case vis i k =>
-      apply BIFUpdate.ne.ne
-      apply OFE.NonExpansive₂.ne (f := H.ihandle i)
-      · intro a; apply Hwp ⟨k a⟩
-      · intro a; apply BIFUpdate.ne.ne <| Hwp ⟨k a⟩
-
-theorem wpi_constF_mono (H : IHandler (PROP := PROP) E) (Φ : R → PROP)
-    (wp1 wp2 : LeibnizO (ITree E R) → PROP) :
-    ⊢ □ (∀ t, wp1 t -∗ wp2 t) -∗
-      ∀ t, wpi_constF H Φ wp1 t -∗ wpi_constF H Φ wp2 t := by
-  iintro #Hwand %t Hwp; unfold wpi_constF
-  cases t.car.unfold <;> simp
-  case ret => iexact Hwp
-  case tau t' => imod Hwp; imodintro; iapply Hwand $$ Hwp
-  case vis i k =>
-    imod Hwp; imodintro; iapply H.ihandle_mono
-    · iintro %a Hk; iapply Hwand $$ Hk
-    · iintro !> %a Hk; imod Hk; imodintro; iapply Hwand $$ Hk
-    · iexact Hwp
-
-instance wp_itree_const_mono (H : IHandler (PROP := PROP) E) (Φ : R → PROP) :
-    BIMonoPred (wpi_constF H Φ) where
-  mono_pred := by
-    iintro %wp1 %wp2 %Hne1 %Hne2 #Hwand %t Hwp
-    iapply wpi_constF_mono H Φ wp1 wp2 $$ [] Hwp
-    iexact Hwand
-  mono_pred_ne.ne n t1 t2 Hdist := by
-    cases Hdist; rfl
-
-/-- The constant-Φ weakest precondition, as the least fixpoint of `wpi_constF`. -/
-def wpi_const (H : IHandler (PROP := PROP) E) (Φ : R → PROP) : ITree E R → PROP :=
-  λ t => bi_least_fixpoint (wpi_constF H Φ) ⟨t⟩
-
-theorem wpi_const_iter (H : IHandler (PROP := PROP) E) (Φ : R → PROP)
-    (P : LeibnizO (ITree E R) → PROP) [NonExpansive P] :
-    ⊢ □ (∀ y, wpi_constF H Φ P y -∗ P y) -∗
-      ∀ t, bi_least_fixpoint (wpi_constF H Φ) t -∗ P t :=
-  @least_fixpoint_iter _ _ _ _ (wpi_constF H Φ) P _
-
-end wp_itree_const
-
-/-! ## Thread-pool weakest precondition -/
-
-/-- The thread-pool weakest precondition, built from `wpi_constF` and `lfp_tp`. -/
-def wpi_tp {E : Effect} {R : Type _} {PROP : Type _} [BI PROP] [BIFUpdate PROP]
-    (H : IHandler (PROP := PROP) E)
-    (Ms : List (((LeibnizO (ITree E R) → PROP) → PROP)))
-    (Φ : R → PROP) : PROP :=
-  lfp_tp (wpi_constF H Φ) Ms
-
-section wpi_tp_section
-
-variable {E : Effect} {R : Type _} {PROP : Type _} [BI PROP] [BIFUpdate PROP] [BIAffine PROP]
-
-theorem wpi_tp_intro (t : ITree E R) (H : IHandler (PROP := PROP) E) (Φ : R → PROP) :
-    (WPi t @> H {{ Φ }}) ⊢ wpi_tp H [λ P => P ⟨t⟩] Φ := by
   sorry
-
-theorem wpi_tp_perm (H : IHandler (PROP := PROP) E) (Φ : R → PROP)
-    (Ms1 Ms2 : List (((LeibnizO (ITree E R) → PROP) → PROP)))
-    (h : Ms1.Perm Ms2) :
-    wpi_tp H Ms1 Φ ⊣⊢ wpi_tp H Ms2 Φ := by
-  simp only [wpi_tp]
-  isplit <;> iintro Htp
-  · iapply lfp_tp_perm (wpi_constF H Φ) Ms1 Ms2 h $$ Htp
-  · iapply lfp_tp_perm (wpi_constF H Φ) Ms2 Ms1 h.symm $$ Htp
-
-end wpi_tp_section
-
-/-! ## Adequacy -/
-
-section wpi_adequate
-
-open ITree.Exec
-
-variable {E : Effect.{u} } {R : Type u} {σ : Type _}
-  {PROP : Type _} [BI PROP] [BIFUpdate PROP] [BIAffine PROP]
-
-theorem wpi_adequate_ind (Φ : R → PROP) (H : IHandler (PROP := PROP) E)
-    (EH : EHandler E E R σ) [A : EHandlerAdequate (PROP := PROP) H EH]
-    (t : ITree E R) (s : σ)
-    (Ms : List (((LeibnizO (ITree E R) → PROP) → PROP)))
-    (Mss : List (((ITree E R → PROP) → PROP)))
-    (M : (LeibnizO (ITree E R) → PROP) → PROP)
-    (C : ITree E R → σ → Prop)
-    (Hexec : exec EH t s C)
-    (HMs : Ms.Perm (M :: Mss.map (λ M' P => M' (λ t => P ⟨t⟩)))) :
-    ⊢ wpi_tp H Ms Φ -∗
-      A.ehandler_inv s Mss -∗
-      (∀ P, M P ={∅}=∗ P ⟨t⟩) -∗
-      |={∅}=> ∃ t' s' Ms' M',
-        ⌜C t' s'⌝ ∗
-        A.ehandler_inv s' Ms' ∗
-        bi_close Eq (λ t'' => iprop(∀ P, M' P ={∅}=∗ P t'')) ⟨t'⟩ ∗
-        wpi_tp H (M' :: Ms'.map (λ M'' P => M'' (λ t => P ⟨t⟩))) Φ := by
-  sorry
-
-theorem wpi_adequate (Φ : R → PROP) (H : IHandler (PROP := PROP) E)
-    (EH : EHandler E E R σ) [A : EHandlerAdequate (PROP := PROP) H EH]
-    (t : ITree E R) (s : σ)
-    (C : ITree E R → σ → Prop) (m : CoPset)
-    (Hexec : exec EH t s C) :
-    ⊢ iprop(|={m,∅}=> wpi H t (λ v => iprop(|={∅,m}=> Φ v))) -∗
-      A.ehandler_inv s [] -∗
-      |={m, ∅}=> ∃ t' s' Ms' M',
-      ⌜C t' s'⌝ ∗
-      A.ehandler_inv s' Ms' ∗
-      bi_close Eq (λ t'' => iprop(∀ P, M' P ={∅}=∗ P t'')) ⟨t'⟩ ∗
-      wpi_tp H (M' :: Ms'.map (λ M'' P => M'' (λ t => P ⟨t⟩))) (λ v => iprop(|={∅,m}=> Φ v)) := by
-  sorry
-
-end wpi_adequate
 
 end Carte.Core

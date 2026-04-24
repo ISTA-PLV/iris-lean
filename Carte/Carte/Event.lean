@@ -1,12 +1,10 @@
-import Carte.Event.Empty
-import Carte.Event.Step
-import Carte.Event.Fail
-import Carte.Event.Halt
-import Carte.Event.Demonic
-import Carte.Event.Angelic
-import Carte.Event.State
-import Carte.Event.Heap
+module
 
-namespace Carte.Event
-
-end Carte.Event
+public import Carte.Event.Empty
+public import Carte.Event.Step
+public import Carte.Event.Fail
+public import Carte.Event.Halt
+public import Carte.Event.Demonic
+public import Carte.Event.Angelic
+public import Carte.Event.State
+public import Carte.Event.Heap

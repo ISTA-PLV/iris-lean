@@ -1,9 +1,7 @@
-import Carte.ThreadPool.CTrace
-import Carte.ThreadPool.Scheduler
-import Carte.ThreadPool.Handler
-import Carte.ThreadPool.Interleaving
-import Carte.ThreadPool.Exec
+module
 
-namespace Carte.ThreadPool
-
-end Carte.ThreadPool
+public import Carte.ThreadPool.CTrace
+public import Carte.ThreadPool.Scheduler
+public import Carte.ThreadPool.Handler
+public import Carte.ThreadPool.Interleaving
+public import Carte.ThreadPool.Exec

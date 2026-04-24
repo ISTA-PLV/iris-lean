@@ -5,5 +5,9 @@ defaultTargets = ["Carte"]
 name = "iris"
 path = "../Iris"
 
+[[require]]
+name = "Coinductive"
+path = "../../coinductive"
+
 [[lean_lib]]
 name = "Carte"

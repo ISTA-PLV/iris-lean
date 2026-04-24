@@ -1,6 +1,10 @@
-import Carte.Core.Handler
-import Carte.Core.WpiMask
-import ITree
+module
+
+public import Carte.Core.HandlerAdequate
+public import Carte.Core.WpiMask
+public import ITree
+
+@[expose] public section
 
 namespace Carte.Event
 
@@ -10,72 +14,56 @@ section handler
 
 variable {PROP : Type _} [BI PROP]
 
-def demonicH {A : Type _} : IHandler (PROP := PROP) (demonicE A) where
-  ihandle := fun i Φ _ => iprop(∀ a : {x // i.1 x}, Φ a)
+def demonicH (α : Type _) : IHandler (PROP := PROP) (demonicE α) where
+  ihandle := λ _ Φ _ => iprop(∀ a, Φ a)
   ihandle_mono := by
-    iintro %i %Φ %Φ' %s %s' HΦwand #Hswand H
-    iintro %a
-    iapply HΦwand
-    iapply H
+    iintro %i %Φ %Φ' %s %s' HΦwand #Hswand H %a
+    iapply HΦwand; iapply H
 
-instance demonicH_sequential {A : Type _} :
-    Sequential (PROP := PROP) (demonicH (PROP := PROP) (A := A)) := by
+instance demonicH_sequential {α : Type _} :
+    Sequential (PROP := PROP) (demonicH (PROP := PROP) α) := by
   constructor
   iintro %i %Φ %s H
-  simp [demonicH] at H ⊢
-  exact H
+  simp [demonicH]
 
 end handler
-
-def demonic_choice (A : Type _) {E : Effect} [demonicE A -< E] [Inhabited A] : ITree E A :=
-  ITree.trigger (demonicE A) ((fun _ => True), inferInstance, inferInstance) >>=
-    fun x => ITree.ITree.ret x.1
 
 section wpi_rules
 
 variable {PROP : Type _} [BI PROP] [BIFUpdate PROP] {E : Effect}
-  {H : IHandler (PROP := PROP) E} {A : Type _}
-  [sub : demonicE A -< E] [Hin : InH (demonicH (PROP := PROP) (A := A)) H]
+  {H : IHandler (PROP := PROP) E} {α : Type _}
+  [sub : demonicE α -< E] [Hin : InH (demonicH (PROP := PROP) α) H]
 
-theorem wpi_demonic_vis {R} (p : A → Prop) [DecidablePred p] [Inhabited {x // p x}]
-    (k : {x // p x} → ITree E R) (M : CoPset) (Φ : R → PROP) :
-    (∀ a, WPi k a @> H; M {{ Φ }}) ⊢
-    (WPi (ITree.trigger (demonicE A) (p, inferInstance, inferInstance) >>= k) @> H; M {{ Φ }}) := by
-  iintro Hwp
-  iapply wpi_bind
-  iapply wpi_trigger (H' := demonicH (PROP := PROP) (A := A))
+theorem wpi_demonic (M : CoPset) (Φ : α → Prop) [Hdec : DecidablePred Φ]
+    [Hi: Inhabited {a // Φ a}] (Ψ : {a // Φ a} → PROP) :
+    (∀ a, Ψ a) ⊢ (WPi (choose Φ) @> H; M {{ Ψ }}) := by
+  change (∀ a, Ψ a) ⊢ (WPi (ITree.trigger (demonicE α) ⟨Φ, Hdec, Hi⟩) @> H; M {{ Ψ }})
+  iintro HΨ;
+  iapply wpi_trigger (demonicH (PROP := PROP) α) M ⟨Φ, Hdec, Hi⟩ Ψ
   iapply fupd_mask_intro
   · exact Std.LawfulSet.empty_subset
-  · iintro Hclose
-    simp [demonicH]
-    iintro %a
-    imod Hclose
-    imodintro
-    iapply Hwp
-
-theorem wpi_demonic [Inhabited A] (M : CoPset) (Φ : A → PROP) :
-    (∀ a, Φ a) ⊢
-    (WPi demonic_choice A @> H; M {{ Φ }}) := by
-  iintro HΦ
-  unfold demonic_choice
-  change (WPi
-    (ITree.trigger (demonicE A) ((fun _ => True), inferInstance, inferInstance) >>=
-      fun x => ITree.ITree.ret x.1) @> H; M {{ Φ }})
-  iapply (wpi_demonic_vis (H := H) (A := A) (p := fun _ => True)
-    (k := fun x => ITree.ITree.ret x.1) (M := M) (Φ := Φ))
-  iintro %a
-  iapply wpi_ret
-  iapply HΦ
+  · iintro Hclose; simp [demonicH]; iintro %a
+    imod Hclose; imodintro; iapply HΨ
 
 end wpi_rules
 
 section exec
 
-open ITree.Exec
+open ITree.Exec Carte.Core
 
 abbrev demonicEH := ITree.Effects.demonicEH
-
--- The Coq `seHandlerAdequate` layer does not currently exist in this Lean port.
+instance demonicEH_adequate {PROP : Type _} [BI PROP] [BIFUpdate PROP] {α : Type _} :
+    SEHandlerAdequate (demonicH (PROP := PROP) α) (demonicEH α) where
+  sehandler_inv _ := iprop(True)
+  sehandler_adequate := by
+    intro i s C Φ1 Φ2 Hhandle
+    simp [demonicH, demonicEH] at Hhandle ⊢
+    rcases Hhandle with ⟨a, s', HC⟩
+    iintro HΦ1 Hinv; imodintro
+    iexists ⟨a, s'⟩; iexists s
+    isplitl []; ipure_intro; exact HC
+    isplitl [Hinv]; iexact Hinv
+    iapply HΦ1
 
 end exec
 

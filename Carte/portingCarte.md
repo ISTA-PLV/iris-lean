@@ -24,31 +24,31 @@ The `islaris` folder should not be ported, all filenames below are relative to t
   - `angelicEH`: part of itree library
   - [ ] exec adequacy
 - `axioms.v`: not necessary in Lean
-- [ ] `choice.v`
+- [x] `choice.v`
   - `demonicE`: part of the itree library
-  - [ ] `demonicH`
-  - [ ] wpi rules
+  - [x] `demonicH`
+  - [x] wpi rules
   - `demonic_irel`: part of trace based adequacy, should not be ported
   - `demonic_ifn`: part of trace based adequacy, should not be ported
   - `demonicEH`: should be given by the itree library
-  - [ ] exec adequacy
-- [ ] `exec.v`
+  - [x] exec adequacy
+- [ ] `exec.v` (split into `Core/Exec.lean`, `Core/HandlerAdequate.lean`, and `Core/Wpi_exec.lean`)
   - [x] `bi_close`
   - [x] `bi_mono0`
   - [ ] `lfp_tp`
   - `eHandler`, `seHandler`, `inEH`, `exec`: provided by the itree library
-  - [ ] `(s)eHandlerAdequate`
-  - [ ] `wpi_tp`
-  - [ ] `wpi_adequate`
+  - [ ] `(s)eHandlerAdequate` (in `Core/HandlerAdequate.lean`)
+  - [ ] `wpi_tp` (in `Core/Wpi_exec.lean`)
+  - [ ] `wpi_adequate` and `wpi_adequate_pure` (both in `Core/HandlerAdequate.lean`, the later has not been defined)
   - `sumEH`: part of itree library
   - `exec`-tactics: port if necessary
-- [ ] `halt.v`
+- [x] `halt.v`
   - `haltE`: part of the itree library
-  - [ ] `haltH`
-  - [ ] wpi rules
+  - [x] `haltH`
+  - [x] wpi rules
   - `halt_ifn` and corresponding adequacy: part of trace based adequacy, should not be ported
   - `haltEH`: part of itree library
-  - [ ] exec adequacy
+  - [x] exec adequacy
 - [x] `handler.v`
   - [x] `iHandler`
   - [x] `sumH`
@@ -64,8 +64,8 @@ The `islaris` folder should not be ported, all filenames below are relative to t
 - `itree.v`: necessary functionality from this file should be provided by the itree library
 - [ ] `state.v`
   - `stateE`: part of itree library
-  - [ ] `stateH`
-  - [ ] wpi rules
+  - [x] `stateH`
+  - [ ] wpi rules (sorry for `wpi_set_state`)
   - `state_irel`, `state_ifn`, `interp_tr_state` and corresponding adequacy: part of trace based adequacy, should not be ported
   - `stateEH`: part of the itree library
   - [ ] exec adequacy

@@ -1,1 +1,3 @@
-import Carte
+module
+
+public import Carte

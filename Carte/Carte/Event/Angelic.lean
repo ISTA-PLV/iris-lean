@@ -1,7 +1,10 @@
-import Carte.Core.Handler
-import Carte.Core.WpiMask
+module
 
-import ITree
+public import Carte.Core.HandlerAdequate
+public import Carte.Core.WpiMask
+public import ITree
+
+@[expose] public section
 
 namespace Carte.Event
 
@@ -12,12 +15,11 @@ section handler
 variable {PROP : Type _} [BI PROP]
 
 def angelicH (α : Type _) : IHandler (PROP := PROP) (angelicE α) where
-  ihandle := λ p Φ _ => iprop(∃ a : {x // p x}, Φ a)
+  ihandle := λ _ Φ _ => iprop(∃ a, Φ a)
   ihandle_mono := by
     iintro %p %Φ %Φ' %s %s' HΦwand #Hswand H
     icases H with ⟨%a, HΦ⟩
-    iexists a
-    iapply HΦwand $$ HΦ
+    iexists a; iapply HΦwand $$ HΦ
 
 instance angelicH_sequential {α : Type _} :
     Sequential (PROP := PROP) (angelicH (PROP := PROP) α) := by
@@ -35,38 +37,31 @@ variable {PROP : Type _} [BI PROP] [BIFUpdate PROP] {E : Effect}
   {H : IHandler (PROP := PROP) E} {α : Type _}
   [sub : angelicE α -< E] [Hin : InH (angelicH (PROP := PROP) α) H]
 
--- Strong angelic rule: any concrete witness [a] satisfying [p] is enough to establish
--- the WP of the triggered angelic choice followed by [k].
-theorem wpi_angelic_vis {R} (p : α → Prop) (k : {x // p x} → ITree E R)
-    (a : {x // p x}) (M : CoPset) (Φ : R → PROP) :
-    (WPi k a @> H; M {{ Φ }}) ⊢
-    (WPi (ITree.trigger (angelicE α) p >>= k) @> H; M {{ Φ }}) := by
-  iintro Hwp; iapply wpi_bind
-  iapply wpi_trigger <| angelicH (PROP := PROP) α
-  simp [angelicH]; iapply fupd_mask_intro
-  · exact Std.LawfulSet.empty_subset
-  · iintro Hemp; iexists a; imod Hemp; imodintro; iexact Hwp
-
--- set_option pp.all true in
--- TODO: Find the reason for iapply failed
 theorem wpi_angelic (M : CoPset) (p : α → Prop) (a : {x // p x}) (Ψ : {x // p x} → PROP) :
     Ψ a ⊢ (WPi (choose_angelic p) @> H; M {{ Ψ }}) := by
-  iintro HΨ; simp [choose_angelic]
-  rw [← ITree.bind_ret (trigger (E₂ := E) (angelicE α) p)]
-  sorry
-  -- iapply wpi_angelic_vis (H := H) p (λ x => ITree.ret x) a M Ψ
-  -- iapply wpi_ret
-  -- iexact HΨ
+  change Ψ a ⊢ (WPi trigger (angelicE α) p @> H; M {{ Ψ }})
+  iintro HΨ; iapply wpi_trigger (H := H) (angelicH (PROP := PROP) α) M p Ψ
+  iapply fupd_mask_intro
+  · exact Std.LawfulSet.empty_subset
+  · iintro Hfalse; simp [angelicH]; iexists a
+    imod Hfalse; imodintro; iexact HΨ
 
 end wpi_rules
 
 section exec
 
-open ITree.Exec
+open ITree.Exec Carte.Core
 
-abbrev angelicEH := ITree.Effects.angelicEH
-
--- The Coq `seHandlerAdequate` layer does not currently exist in this Lean port.
+instance angelicEH_adequate {PROP : Type _} [BI PROP] [BIFUpdate PROP] {α : Type _} :
+    SEHandlerAdequate (angelicH (PROP := PROP) α) (angelicEH α) where
+  sehandler_inv _ := iprop(True)
+  sehandler_adequate := by
+    intro i s C Φ1 Φ2 Hhandle
+    simp [angelicH, angelicEH] at Hhandle ⊢
+    iintro Hwp Hinv; icases Hwp with ⟨%a, HΦ⟩
+    imodintro; iexists a, s
+    isplitl []; ipure_intro; sorry
+    isplitl [Hinv]; iexact Hinv; iexact HΦ
 
 end exec
 

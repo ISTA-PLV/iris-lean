@@ -1,6 +1,10 @@
-import Iris.ProofMode
-import Iris.Instances.IProp
-import ITree.Definition
+module
+
+public import Iris.ProofMode
+public import Iris.Instances.IProp
+public import ITree.Definition
+
+@[expose] public section
 
 open Iris BI ITree
 

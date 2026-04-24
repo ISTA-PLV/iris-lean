@@ -1,10 +1,14 @@
-import Carte.Core.Handler
-import Carte.Core.ITree
-import Carte.Core.Wpi
-import Iris.ProofMode
-import Iris.BI.Lib.Fixpoint
-import ITree.Definition
-import ITree.Effect
+module
+
+public import Carte.Core.Handler
+public import Carte.Core.ITree
+public import Carte.Core.Wpi
+public import Iris.ProofMode
+public import Iris.BI.Lib.Fixpoint
+public import ITree.Definition
+public import ITree.Effect
+
+@[expose] public section
 
 open Iris BI ITree
 
