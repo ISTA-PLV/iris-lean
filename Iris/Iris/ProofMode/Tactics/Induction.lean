@@ -12,6 +12,7 @@ public meta import Iris.ProofMode.Patterns.CasesPattern
 public meta import Iris.ProofMode.ClassesMake
 public meta import Iris.ProofMode.Tactics.RevertIntro
 public meta import Lean.Meta.Tactic.TryThis
+public meta import Lean.Elab.Tactic
 
 namespace Iris.ProofMode
 
@@ -19,7 +20,7 @@ public meta section
 open BI Std Lean Elab Tactic Meta Qq Parser.Tactic
 
 syntax (name := iinduction) "iinduction" colGt term
-    ("using" ident)?
+    ("using" term)?
     ("generalizing" (ppSpace colGt selPat)+)?
     (inductionAlts)? : tactic
 
@@ -339,7 +340,7 @@ private def checkCtors (ctors : List Name) (parsedAlts : Alts) : ProofModeM Unit
 private def iInductionCore {u} {prop : Q(Type u)} {bi : Q(BI $prop)} {e}
     (hyps : Hyps bi e) (goal : Q($prop)) (fvar : FVarId)
     (parsedAlts : Option Alts)
-    (altRecName : Option Name)
+    (elimInfo : Option ElimInfo)
     (genSelPats : Option <| List SelPat) :
     ProofModeM Q($e ⊢ $goal) := do
   -- Find the regular pure/Iris hypotheses to be reverted
@@ -355,27 +356,30 @@ private def iInductionCore {u} {prop : Q(Type u)} {bi : Q(BI $prop)} {e}
 
   -- Find the recursor name and constructor names of the inductive datatype
   let fvarType ← whnf <| ← inferType <| mkFVar fvar
+
+
   let recName ← match fvarType.getAppFn with
-  | .const indName _ =>
-    match (← getEnv).find? indName with
-    | some (.inductInfo _) =>
-        let recName ←
-          match altRecName, ← getCustomEliminator? #[mkFVar fvar] true with
+      | .const indName _ =>
+        match (← getEnv).find? indName with
+        | some (.inductInfo _) =>
+          match ← getCustomEliminator? #[mkFVar fvar] true with
           -- Use the user-supplied recursor name if available
-          | some altRecName, _ => pure altRecName
           -- Use the default recursor name if available
-          | none, some r => pure r
+          | some r => pure r
           -- Use `.rec` as the fallback option
-          | none, none => pure <| mkRecName indName
-        pure recName
-    | _ => throwError "iinduction: {indName} is not inductive"
-  | _ => throwError "iinduction: unable to determine inductive type"
+          | none => pure <| mkRecName indName
+          -- pure ((← Lean.Meta.getElimInfo recName).altsInfo.map (·.name)).toList
+        | _ => throwError "iinduction: {indName} is not inductive"
+      | _ => throwError "iinduction: unable to determine inductive type"
+
+  -- Find the constructor names
+  let recCtors : List Name ← do
+    match elimInfo with
+    | none => pure ((← Lean.Meta.getElimInfo recName).altsInfo.map (·.name)).toList
+    | some elimInfo => pure (elimInfo.altsInfo.map (·.name)).toList
 
   let matcher : Name → Alt → Bool :=
     fun ctor alt => alt.ctor != .anonymous && matchesCtorName ctor alt.ctor
-
-  -- Find the constructor names
-  let recCtors := ((← Lean.Meta.getElimInfo recName).altsInfo.map (·.name)).toList
 
   -- Check that all alternative names supplied by the user are valid
   match parsedAlts with
@@ -528,6 +532,83 @@ private def generalizeTermWithFVar (x : TSyntax `term) : TacticM FVarId := do
   replaceMainGoal [newMVarId]
 
   return fvars[0]!
+def elabTermForElim (stx : Syntax) : TermElabM Expr := do
+  -- Short-circuit elaborating plain identifiers
+  if stx.isIdent then
+    if let some e ← Term.resolveId? stx (withInfo := true) then
+      return e
+  Term.withoutErrToSorry <| Term.withoutHeedElabAsElim do
+    let e ← Term.elabTerm stx none (implicitLambda := false)
+    Term.synthesizeSyntheticMVars (postpone := .no) (ignoreStuckTC := true)
+    let e ← instantiateMVars e
+    let e := e.eta
+    if e.hasMVar then
+      let r ← abstractMVars (levels := false) e
+      return r.expr
+    else
+      return e
+
+def getInductiveValFromMajor (induction : Bool) (major : Expr) : TacticM InductiveVal :=
+  liftMetaMAtMain fun mvarId => do
+    let majorType ← inferType major
+    let majorType ← whnf majorType
+    matchConstInduct majorType.getAppFn
+      (fun _ => do
+        let tacticName := if induction then `induction else `cases
+        let mut hint := m!"\n\nExplanation: the `{tacticName}` tactic is for constructor-based reasoning \
+          as well as for applying custom {tacticName} principles with a 'using' clause or a registered '@[{tacticName}_eliminator]' theorem. \
+          The above type neither is an inductive type nor has a registered theorem."
+        if majorType.isProp then
+          hint := m!"{hint}\n\n\
+            Consider using the 'by_cases' tactic, which does true/false reasoning for propositions."
+        else if majorType.isType then
+          hint := m!"{hint}\n\n\
+            Type universes are not inductive types, and type-constructor-based reasoning is not possible. \
+            This is a strong limitation. According to Lean's underlying theory, the only provable distinguishing \
+            feature of types is their cardinalities."
+        Meta.throwTacticEx tacticName mvarId m!"major premise type is not an inductive type{indentExpr majorType}{hint}")
+      (fun val _ => pure val)
+
+-- `optElimId` is of the form `("using" term)?`
+def getElimNameInfo (optElimId : Syntax) (targets : Array Expr) (induction : Bool) : TacticM ElimInfo := do
+  let getBaseName? (elimName : Name) : MetaM (Option Name) := do
+    -- not a precise check, but covers the common cases of T.recOn / T.casesOn
+    -- as well as user defined T.myInductionOn to locate the constructors of T
+    let t := elimName.getPrefix
+    if ← isInductive t then
+      return some t
+    else
+      return none
+  if optElimId.isNone then
+    if tactic.customEliminators.get (← getOptions) then
+      if let some elimName ← getCustomEliminator? targets induction then
+        return ← getElimInfo elimName (← getBaseName? elimName)
+    unless targets.size == 1 do
+      throwMissingEliminator
+    let indVal ← getInductiveValFromMajor induction targets[0]!
+    if induction && indVal.all.length != 1 then
+      throwUnsupportedInductionType indVal.name "mutually inductive"
+    if induction && indVal.isNested then
+      throwUnsupportedInductionType indVal.name "a nested inductive type"
+    let elimName := if induction then mkRecName indVal.name else mkCasesOnName indVal.name
+    getElimInfo elimName indVal.name
+  else
+    let elimTerm := optElimId[1]
+    let elimExpr ← withRef elimTerm do elabTermForElim elimTerm
+    let baseName? ← do
+      let some elimName := elimExpr.getAppFn.constName? | pure none
+      getBaseName? elimName
+    withRef elimTerm <| getElimExprInfo elimExpr baseName?
+where
+  throwMissingEliminator :=
+    let tacName := if induction then "induction" else "cases"
+    throwError m!"Missing eliminator: An eliminator must be provided when multiple induction \
+          targets are specified and no default eliminator has been registered"
+          ++ .hint' m!"Write `using <eliminator-name>` to specify an eliminator, or register a default \
+                        eliminator with the attribute `[{tacName}_eliminator]`"
+  throwUnsupportedInductionType (name : Name) (kind : String) :=
+    throwError m!"The `induction` tactic does not support the type `{name}` because it is {kind}"
+        ++ .hint' "Consider using the `cases` tactic instead"
 
 /--
   The `iinduction` tactic applies induction in the Iris Proof Mode in a similar
@@ -568,13 +649,18 @@ private def generalizeTermWithFVar (x : TSyntax `term) : TacticM FVarId := do
 -/
 elab_rules : tactic
   | `(tactic| iinduction $x
-        $[using $r]?
+        $[using $r:term]?
         $[generalizing $genSelPats*]?
         $[$alts]?) => do
     let fvar ← generalizeTermWithFVar x
+    let targetExpr := (mkFVar fvar)
 
-    -- Parse the recursor name provided by the user
-    let recName : Option Name := r.map (·.getId)
+    let elimInfo ← do
+      match r with
+      | none => pure none
+      | some r =>
+        let targets := #[targetExpr]
+        pure <| some <| ← getElimNameInfo r targets (induction := true)
 
     -- Parse the list of alternative names supplied by the user
     let parsedAlts ← match alts with
@@ -586,5 +672,5 @@ elab_rules : tactic
         liftMacroM <| SelPat.parse pats
 
     ProofModeM.runTactic λ mvar { hyps, goal, .. } => do
-      let pf ← iInductionCore hyps goal fvar parsedAlts recName genSelPats
+      let pf ← iInductionCore hyps goal fvar parsedAlts elimInfo genSelPats
       mvar.assign pf

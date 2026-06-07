@@ -2779,6 +2779,13 @@ example [BI PROP] {P R S : PROP} {Q T : Nat → PROP} {n : Nat} :
   | zero => itrivial
   | ind n ih => itrivial
 
+example [BI PROP] {P R S : PROP} {Q T : Nat → PROP} {n : Nat} :
+    ⊢ P -∗ □ Q m -∗ □ R -∗ S -∗ □ T n -∗ ⌜n + m + 0 = n + m⌝ := by
+  iintro HP #HQ #HR HS #HT
+  iinduction n using ((((if true then Nat.caseStrongRecOn else Nat.caseStrongRecOn)))) with
+  | zero => itrivial
+  | ind n ih => itrivial
+
 inductive Tree (α : Type u) where
   | leaf : Tree α
   | node : Tree α → α → Tree α → Tree α
