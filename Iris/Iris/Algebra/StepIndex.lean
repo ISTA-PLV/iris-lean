@@ -12,8 +12,11 @@ public import Iris.Std.Classes
 
 namespace Iris
 
-@[rocq_alias sidx, rocq_alias SIdxMixin]
-class SIdx (I : Type u) extends LT I, LE I, Zero I where
+@[rocq_alias sidx]
+structure SIdxMixin (I : Type _) : Type _ where
+  instLT : LT I
+  instLE : LE I
+  instZero : Zero I
   succ : I → I
   lt_trans : ∀ {n m p : I}, n < m → m < p → n < p
   lt_wf : WellFounded ((· < ·) : I → I → Prop)
@@ -24,11 +27,20 @@ class SIdx (I : Type u) extends LT I, LE I, Zero I where
   succ_le_of_lt : ∀ {n m : I}, n < m → succ n ≤ m
   weak_case : ∀ n : I, (Σ' m : I, n = succ m) ⊕' ∀ m : I, m < n → succ m < n
 
-/-- The step-indexing successor operator. -/
-scoped prefix:max "succᵢ" => SIdx.succ
+@[rocq_alias SIdxMixin]
+class SIdx : Type _ where
+  I : Type
+  mixin : SIdxMixin I
 
-class SIdxFinite (I : Type u) [SIdx I] where
-  finite_index : ∀ n : I, n = 0 ∨ ∃ m, n = succᵢ m
+instance [SIdx] : LT SIdx.I := SIdx.mixin.instLT
+instance [SIdx] : LE SIdx.I := SIdx.mixin.instLE
+instance [SIdx] : Zero SIdx.I := SIdx.mixin.instZero
+
+/-- The step-indexing successor operator. -/
+scoped prefix:max "succᵢ" => SIdx.mixin.succ
+
+class SIdxFinite [instSI : SIdx] where
+  finite_index : ∀ n : instSI.I, n = 0 ∨ ∃ m, n = succᵢ m
 
 #rocq_ignore SIdx.lt_trans "Lifting of mixin properties not required as they are part of the type class SIdx"
 #rocq_ignore SIdx.lt_wf "Lifting of mixin properties not required as they are part of the type class SIdx"
@@ -42,6 +54,8 @@ class SIdxFinite (I : Type u) [SIdx I] where
 namespace SIdx
 
 open Iris Std
+
+/-
 
 variable {I : Type u} [inst : SIdx I] {m n p : I}
 
@@ -388,5 +402,7 @@ theorem rec_lim {P : I → Sort v} (s : P 0) (f : ∀ n, P n → P (succᵢ n))
 #rocq_ignore SIdx.rec_lim_ext
   "Proof irrelevance already handled automatically by Lean for the theorems \
   rec_zero, rec_succ and rec_lim"
+
+-/
 
 end SIdx
