@@ -6,6 +6,7 @@ Authors: Lars König, Mario Carneiro
 module
 
 public import Iris.Algebra.OFE
+public import Iris.Algebra.StepIndexFinite
 public import Iris.BI.BIBase
 
 @[expose] public section
