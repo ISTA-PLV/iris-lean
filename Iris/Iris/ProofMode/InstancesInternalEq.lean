@@ -45,7 +45,7 @@ instance fromModal_internalEq_next [Sbi PROP] [OFE A] (x y : A) :
 @[ipm_backtrack, rocq_alias into_laterN_Next]
 instance intoLaterN_internalEq_next [Sbi PROP] [OFE A] (x y : A)
     only_head n n' [h : NatCancel n 1 n' m'] [hm : TCEq m' 0] :
-    IntoLaterN (PROP := PROP) strict only_head n iprop(Later.next x ≡ Later.next y)
+    IntoLaterN (PROP := PROP) only_head n iprop(Later.next x ≡ Later.next y)
       iprop(x ≡ y) where
   into_laterN := by
     refine (later_equivI_mp x y).trans ?_
