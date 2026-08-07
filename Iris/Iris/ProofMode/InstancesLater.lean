@@ -273,6 +273,10 @@ instance fromModal_laterN [BI PROP] (P : PROP) n :
   FromModal True (modality_laterN n) iprop(▷^[n] P) iprop(▷^[n] P) P where
   from_modal _ := .rfl
 
+instance fromModal_laterIf [BI PROP] (P : PROP) p :
+  FromModal True (modality_laterN p.toNat) iprop(▷^[p.toNat] P) iprop(▷?p P) P where
+  from_modal _ := .rfl
+
 @[rocq_alias from_modal_except_0]
 instance fromModal_except0 [BI PROP] (P : PROP) :
   FromModal True modality_id iprop(◇ P) iprop(◇ P) P where
@@ -383,6 +387,13 @@ instance (priority := default - 20) intoLaterN_laterN [BI PROP] only_head n m n'
   into_laterN := (laterN_mono _ h2.1).trans $ (laterN_add _ _).2.trans $ by
     rw [Nat.add_comm, h1.1]
     apply (laterN_add _ _).1.trans (laterN_mono _ h3.1.1)
+
+@[ipm_backtrack]
+instance (priority := default - 25) intoLaterN_laterIf [BI PROP] only_head n (p : Bool) n' m' (P Q : PROP)
+    [h1 : NatCancel n p.toNat n' m'] [TCEq m' 0]
+    [h2 : IntoLaterN only_head n' P Q]
+    : IntoLaterN only_head n iprop(▷?p P) Q where
+  into_laterN := by sorry
 
 @[rocq_alias into_laterN_laterN_bool]
 instance (priority := default - 30) intoLaterN_laterN_bool [BI PROP] only_head n (p : Bool) n' m' (P Q lQ : PROP)

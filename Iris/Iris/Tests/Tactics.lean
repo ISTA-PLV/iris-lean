@@ -2678,7 +2678,7 @@ example [BI PROP] (P Q : PROP) : ⊢ ▷ P -∗ Q -∗ ▷ (P ∗ Q) := by
   icombine HP HQ as HPQ
   iassumption
 
-set_option trace.Meta.synthInstance true in
+--set_option trace.Meta.synthInstance true in
 /-- Tests `inext` with the handling of `BIBase.laterIf` and other modalities. -/
 example [BI PROP] (p : Bool) (P Q : PROP) : ⊢ □ ▷ P -∗ □ ▷?p ▷ Q -∗ ▷?p ▷ □ (P ∗ Q) := by
   iintro #HP #HQ
