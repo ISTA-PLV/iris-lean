@@ -1266,11 +1266,11 @@ instance {P : α → Type _} [∀ x, OFE (P x)] [∀ x, IsCOFE (P x)] : IsCOFE (
 #rocq_ignore sigT_compl "Local Compl definition; folded into Lean's IsCOFE instance."
 
 set_option linter.checkUnivs false in
-abbrev OFunctorPre (SI : outParam <| Type _) [SIdx SI] := ∀ α β [COFE α] [COFE β], Type _
+abbrev OFunctorPre {SI : outParam <| Type _} [SIdx SI] := ∀ α β [COFE α] [COFE β], Type _
 #rocq_ignore oFunctor_apply "Definition for application of an `oFunctor`; subsumed by `OFunctorPre` in Lean."
 
 @[rocq_alias oFunctor]
-class OFunctor (SI) [SIdx SI] (F : OFunctorPre SI) where
+class OFunctor {SI} [SIdx SI] (F : OFunctorPre) where
   ofe [COFE α] [COFE β] : OFE (F α β)
   map [COFE α₁] [COFE α₂] [COFE β₁] [COFE β₂] :
     (α₂ -n> α₁) → (β₁ -n> β₂) → F α₁ β₁ -n> F α₂ β₂
@@ -1282,7 +1282,7 @@ class OFunctor (SI) [SIdx SI] (F : OFunctorPre SI) where
     map (f.comp g) (g'.comp f') x = map g g' (map f f' x)
 
 @[rocq_alias oFunctorContractive]
-class OFunctorContractive SI [SIdx SI] (F : OFunctorPre SI) extends OFunctor SI F where
+class OFunctorContractive {SI} [SIdx SI] (F : OFunctorPre) extends OFunctor F where
   map_contractive [COFE α₁] [COFE α₂] [COFE β₁] [COFE β₂] :
     Contractive (Function.uncurry (@map α₁ α₂ β₁ β₂ _ _ _ _))
 
@@ -1311,12 +1311,12 @@ open COFE
 
 variable [SIdx SI]
 
-abbrev DiscreteFunOF {C : Type _} (F : C → OFunctorPre SI) : OFunctorPre SI :=
+abbrev DiscreteFunOF {C : Type _} (F : C → OFunctorPre) : OFunctorPre :=
   fun A B _ _ => (c : C) → F c A B
 
 @[rocq_alias discrete_funOF]
-instance oFunctor_discreteFunOF {C} (F : C → OFunctorPre SI) [∀ c, OFunctor SI (F c)] :
-    OFunctor SI (DiscreteFunOF F) where
+instance oFunctor_discreteFunOF {C} (F : C → OFunctorPre) [∀ c, OFunctor (F c)] :
+    OFunctor (DiscreteFunOF F) where
   ofe := _
   map f₁ f₂ := mapCodHom fun _ => OFunctor.map f₁ f₂
   map_ne.ne _ _ _ Hx _ _ Hy _ _ := OFunctor.map_ne.ne Hx Hy ..
@@ -1324,8 +1324,8 @@ instance oFunctor_discreteFunOF {C} (F : C → OFunctorPre SI) [∀ c, OFunctor 
   map_comp f g f' g' x := funext fun c => OFunctor.map_comp f g f' g' (x c)
 
 @[rocq_alias discrete_funOF_contractive]
-instance oFunctor_discreteFunOF_contractive {C} (F : C → OFunctorPre SI)
-    [∀ c, OFunctorContractive SI (F c)] : OFunctorContractive SI (DiscreteFunOF F) where
+instance oFunctor_discreteFunOF_contractive {C} (F : C → OFunctorPre)
+    [∀ c, OFunctorContractive (F c)] : OFunctorContractive (DiscreteFunOF F) where
   map_contractive.1 h _ _ := OFunctorContractive.map_contractive.distLater_dist h _
 
 end DiscreteFunOF
@@ -1426,13 +1426,13 @@ open COFE
 
 variable [SIdx SI]
 
-abbrev OptionOF (F : OFunctorPre SI) : OFunctorPre SI :=
+abbrev OptionOF (F : OFunctorPre) : OFunctorPre :=
   fun A B _ _ => Option (F A B)
 
-variable (F : OFunctorPre SI)
+variable (F : OFunctorPre)
 
 @[rocq_alias optionOF]
-instance oFunctorOption [OFunctor SI F] : OFunctor SI (OptionOF F) where
+instance oFunctorOption [OFunctor F] : OFunctor (OptionOF F) where
   ofe := _
   map f g := optionMap (OFunctor.map f g)
   map_ne.ne _ _ _ Hx _ _ Hy z := by
@@ -1448,7 +1448,7 @@ instance oFunctorOption [OFunctor SI F] : OFunctor SI (OptionOF F) where
     | some c => exact some_eqv_some.mpr (OFunctor.map_comp f g f' g' c)
 
 @[rocq_alias optionOF_contractive]
-instance [OFunctorContractive SI F] : OFunctorContractive SI (OptionOF F) where
+instance [OFunctorContractive F] : OFunctorContractive (OptionOF F) where
   map_contractive.1 H z := by
     have := (OFunctorContractive.map_contractive (F := F)).distLater_dist H
     cases z <;> simp_all [optionMap, Dist, Option.Forall₂, Function.uncurry, OFunctor.map]
@@ -1490,13 +1490,13 @@ def Prod.mapO (f : A -n> A') (g : B -n> B') : A × B -n> A' × B' where
 instance Prod.mapO_ne : NonExpansive₂ (Prod.mapO (A := A) (A' := A') (B := B) (B' := B')) where
   ne _ _ _ Hf _ _ Hg _ := Prod.map_ne Hf Hg
 
-abbrev ProdOF {SI} [SIdx SI] (F1 F2 : OFunctorPre SI) :
-    OFunctorPre SI :=
+abbrev ProdOF {SI} [SIdx SI] (F1 F2 : OFunctorPre) :
+    OFunctorPre :=
   fun A B => (F1 A B) × (F2 A B)
 
 open OFunctor in
 @[rocq_alias prodOF]
-instance instOFunctorProdOF [OFunctor SI F1] [OFunctor SI F2] : OFunctor SI (ProdOF F1 F2) where
+instance instOFunctorProdOF [OFunctor F1] [OFunctor F2] : OFunctor (ProdOF F1 F2) where
   ofe := inferInstance
   map f g := Prod.mapO (map f g) (map f g)
   map_ne.ne _ _ _ Hx _ _ Hy _ := ⟨map_ne.ne Hx Hy _, map_ne.ne Hx Hy _⟩
@@ -1505,8 +1505,8 @@ instance instOFunctorProdOF [OFunctor SI F1] [OFunctor SI F2] : OFunctor SI (Pro
 
 open OFunctorContractive in
 @[rocq_alias prodOF_contractive]
-instance instOFunctorContractiveProdOF [OFunctorContractive SI F1] [OFunctorContractive SI F2] :
-    OFunctorContractive SI (ProdOF F1 F2) where
+instance instOFunctorContractiveProdOF [OFunctorContractive F1] [OFunctorContractive F2] :
+    OFunctorContractive (ProdOF F1 F2) where
   map_contractive.1 H _ :=
    Prod.map_ne (fun _ => map_contractive.1 H _) (fun _ => map_contractive.1 H _)
 
@@ -1548,11 +1548,11 @@ def Sum.mapO (f : A -n> A') (g : B -n> B') : A ⊕ B -n> A' ⊕ B' where
 instance Sum.mapO_ne : NonExpansive₂ (Sum.mapO (A := A) (A' := A') (B := B) (B' := B')) where
   ne _ _ _ Hf _ _ Hg _ := Sum.map_ne Hf Hg
 
-abbrev SumOF {SI} [SIdx SI] (F1 F2 : OFunctorPre SI) : OFunctorPre SI := fun A B => (F1 A B) ⊕ (F2 A B)
+abbrev SumOF {SI} [SIdx SI] (F1 F2 : OFunctorPre) : OFunctorPre := fun A B => (F1 A B) ⊕ (F2 A B)
 
 open OFunctor in
 @[rocq_alias sumOF]
-instance instOFunctorSumOF [OFunctor SI F1] [OFunctor SI F2] : OFunctor SI (SumOF F1 F2) where
+instance instOFunctorSumOF [OFunctor F1] [OFunctor F2] : OFunctor (SumOF F1 F2) where
   ofe := inferInstance
   map f g := Sum.mapO (map f g) (map f g)
   map_ne.ne _ _ _ Hx _ _ Hy x := match x with
@@ -1567,8 +1567,8 @@ instance instOFunctorSumOF [OFunctor SI F1] [OFunctor SI F2] : OFunctor SI (SumO
 
 open OFunctorContractive in
 @[rocq_alias sumOF_contractive]
-instance instOFunctorContractiveSumOF [OFunctorContractive SI F1] [OFunctorContractive SI F2] :
-    OFunctorContractive SI (SumOF F1 F2) where
+instance instOFunctorContractiveSumOF [OFunctorContractive F1] [OFunctorContractive F2] :
+    OFunctorContractive (SumOF F1 F2) where
   map_contractive.1 H _ :=
     Sum.map_ne (fun _ => map_contractive.1 H _) (fun _ => map_contractive.1 H _)
 
@@ -1587,12 +1587,12 @@ def Sigma.mapO {P1 P2 : A → Type _} [∀ x, OFE (P1 x)] [∀ x, OFE (P2 x)] :
   ne := ⟨fun n f g hdist x => ⟨rfl, hdist _ _⟩⟩
 
 open OFunctor in
-abbrev SigmaOF (F : A → OFunctorPre SI) : OFunctorPre SI :=
+abbrev SigmaOF (F : A → OFunctorPre) : OFunctorPre :=
   fun B C => Sigma (fun (a : A) => (F a) B C)
 
 open OFunctor in
 @[rocq_alias sigTOF]
-instance instOFunctorSigmaOF {F : A → OFunctorPre SI} [∀ a, OFunctor SI (F a)] : OFunctor SI (SigmaOF F) where
+instance instOFunctorSigmaOF {F : A → OFunctorPre} [∀ a, OFunctor (F a)] : OFunctor (SigmaOF F) where
   ofe := inferInstance
   map f g := Sigma.mapO (fun _ => map f g)
   map_ne.ne _ _ _ Hx _ _ Hy := NonExpansive.ne (fun _ => map_ne.ne Hx Hy)
@@ -1602,8 +1602,8 @@ instance instOFunctorSigmaOF {F : A → OFunctorPre SI} [∀ a, OFunctor SI (F a
 
 open OFunctorContractive in
 @[rocq_alias sigTOF_contractive]
-instance instOFunctorContractiveSigmaOF [∀ a, OFunctorContractive SI (F a)] :
-    OFunctorContractive SI (SigmaOF F) where
+instance instOFunctorContractiveSigmaOF [∀ a, OFunctorContractive (F a)] :
+    OFunctorContractive (SigmaOF F) where
   map_contractive.1 H := Sigma.mapO.ne.ne (fun _ => map_contractive.1 H)
 
 end SigmaOF
@@ -1614,10 +1614,10 @@ open COFE
 
 variable [SIdx SI]
 
-abbrev constOF (B : Type) : OFunctorPre SI := fun _ _ _ _ => B
+abbrev constOF (B : Type) : OFunctorPre := fun _ _ _ _ => B
 
 @[rocq_alias constOF]
-instance oFunctorConstOF [COFE B] : OFunctor SI (constOF B) where
+instance oFunctorConstOF [COFE B] : OFunctor (constOF B) where
   ofe := _
   map _ _ := ⟨id, id_ne⟩
   map_ne := by intros; constructor; simp
@@ -1625,7 +1625,7 @@ instance oFunctorConstOF [COFE B] : OFunctor SI (constOF B) where
   map_comp := by simp
 
 @[rocq_alias constOF_contractive]
-instance OFunctor.constOF_contractive [COFE B] : OFunctorContractive SI (constOF B) where
+instance OFunctor.constOF_contractive [COFE B] : OFunctorContractive (constOF B) where
   map_contractive.1 := by simp [OFunctor.map]
 
 end constOF
@@ -1636,11 +1636,11 @@ open COFE
 
 variable [SIdx SI]
 
-abbrev IdOF : OFunctorPre SI := fun (_ : Type _) (B : Type _) (_ : COFE _) (_ : COFE B) => B
+abbrev IdOF : OFunctorPre := fun (_ : Type _) (B : Type _) (_ : COFE _) (_ : COFE B) => B
 
 open OFunctor in
 @[rocq_alias idOF]
-instance : OFunctor SI IdOF where
+instance : OFunctor IdOF where
   ofe := inferInstance
   map _ g := g
   map_ne.ne _ _ _ _ _ _ Hy := Hy
@@ -1668,12 +1668,12 @@ instance instNonExpansive₂HomMap :
   ne {_ _ _} Hx {y₁ _} Hy f g :=
     (NonExpansive.ne (f := y₁) (NonExpansive.ne (f := f) (Hx g))).trans (Hy _)
 
-abbrev HomOF (F1 F2 : OFunctorPre SI) [OFunctor SI F1] [OFunctor SI F2] : OFunctorPre SI :=
+abbrev HomOF (F1 F2 : OFunctorPre) [OFunctor F1] [OFunctor F2] : OFunctorPre :=
   fun (A : Type _) (B : Type _) (_ : COFE A) (_ : COFE B) => @F1 B A _ _ -n> @F2 A B _ _
 
 open OFunctor in
 @[rocq_alias ofe_morOF]
-instance instOFunctorHomOF [OFunctor SI F1] [OFunctor SI F2] : OFunctor SI (HomOF F1 F2) where
+instance instOFunctorHomOF [OFunctor F1] [OFunctor F2] : OFunctor (HomOF F1 F2) where
   ofe := inferInstance
   map f g := Hom.map (map (F := F1) g f) (map (F := F2) f g)
   map_ne.ne _ _ _ Hf _ _ Hg := NonExpansive₂.ne (map_ne.ne Hg Hf) (map_ne.ne Hf Hg)
@@ -1683,8 +1683,8 @@ instance instOFunctorHomOF [OFunctor SI F1] [OFunctor SI F2] : OFunctor SI (HomO
 
 open OFunctorContractive in
 @[rocq_alias ofe_morOF_contractive]
-instance instOFunctorContractiveHomOF [OFunctorContractive SI F1] [OFunctorContractive SI F2] :
-    OFunctorContractive SI (HomOF F1 F2) where
+instance instOFunctorContractiveHomOF [OFunctorContractive F1] [OFunctorContractive F2] :
+    OFunctorContractive (HomOF F1 F2) where
   map_contractive.1 {n : SI} ab ab' h := match ab, ab' with
     | ⟨a, b⟩, ⟨a', b'⟩ => by
       simp only [Function.uncurry_apply_pair, OFunctor.map]
@@ -2122,13 +2122,13 @@ open COFE
 
 variable [SIdx SI]
 
-abbrev LaterOF (F : OFunctorPre SI) : OFunctorPre SI :=
+abbrev LaterOF (F : OFunctorPre) : OFunctorPre :=
   fun A B _ _ => Later (F A B)
 
-variable (F : OFunctorPre SI)
+variable (F : OFunctorPre)
 
 @[rocq_alias laterOF]
-instance instOFunctorLater [OFunctor SI F] : OFunctor SI (LaterOF F) where
+instance instOFunctorLater [OFunctor F] : OFunctor (LaterOF F) where
   ofe := _
   map f g := laterMap (OFunctor.map f g)
   map_ne.ne _ _ _ Hx _ _ Hy _ _ := (OFunctor.map_ne.ne Hx Hy _).lt
@@ -2136,7 +2136,7 @@ instance instOFunctorLater [OFunctor SI F] : OFunctor SI (LaterOF F) where
   map_comp f g f' g' x := congrArg Later.next (OFunctor.map_comp f g f' g' x.car)
 
 @[rocq_alias laterOF_contractive]
-instance instOFunctorContractiveLater [OFunctor SI F] : OFunctorContractive SI (LaterOF F) where
+instance instOFunctorContractiveLater [OFunctor F] : OFunctorContractive (LaterOF F) where
   map_contractive.1 H _ _ hlt :=
     OFunctor.map_ne.ne (DistLater.dist_lt H hlt).1 (DistLater.dist_lt H hlt).2 _
 

@@ -104,6 +104,9 @@ instance : COFE (Tower F) where
     refine ((down ..).ne.1 conv_compl).trans <| .trans ?_ conv_compl.symm
     exact (c.chain n).down.dist
   conv_compl _ := conv_compl
+  lbcompl := sorry
+  conv_lbcompl := sorry
+  lbcompl_ne := sorry
 
 #rocq_ignore solver.tower_cofe "Use IsCOFE instance"
 #rocq_ignore solver.tower_compl "Use IsCOFE instance"
