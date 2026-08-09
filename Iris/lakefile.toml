@@ -24,3 +24,8 @@ name = "dumpPortingData"
 srcDir = "Iris/Std"
 root = "DumpPortingData"
 supportInterpreter = true
+
+[leanOptions]
+linter.all = true
+linter.extra = true
+linter.missingDocs = false
