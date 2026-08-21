@@ -1,6 +1,7 @@
 name = "iris"
 defaultTargets = ["Iris"]
 testDriver = "IrisTest"
+precompileModules = true
 
 [[require]]
 name = "Qq"
@@ -29,3 +30,6 @@ supportInterpreter = true
 name = "check-imports"
 srcDir = "../scripts"
 root = "CheckImports"
+
+[leanOptions]
+linter.all = false
