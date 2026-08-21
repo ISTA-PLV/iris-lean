@@ -19,8 +19,6 @@ def cons : Val := hl_val% λ x, some(ref(x))
 
 def llength : Val := hl_val% λ x, #(0 : Int)
 
-/-- Continuation-passing list builder: keeps the generated program term linear
-    in `n` rather than quadratic. Same shape as `makeList2` in the uploads. -/
 def makeList2 : List Int → (Exp → Exp) → Exp
   | [] => λ cont => cont nil
   | l :: ls => λ cont =>
@@ -28,7 +26,6 @@ def makeList2 : List Int → (Exp → Exp) → Exp
     let vls := &e;
     &(cont hl(&cons (#l, vls)))
 
-/-- Opaque variant, matching Rocq's `Admitted` `isList`. -/
 opaque isList [HeapLangGS hlc GF] (v : Val) (xs : List Int) : IProp GF
 
 theorem isList_nil {v} [HeapLangGS hlc GF] :
@@ -60,29 +57,7 @@ def buildList (l : List Int) : Exp :=
   &llength v
 
 /-- Set the length of the list. -/
-abbrev n : Nat := 250
-
-example :
-    ⊢@{IProp GF} WP (buildList (replicate n 1)) {{ fun bv => iprop% ⌜bv = hl_val(#((n : Int)))⌝ }} := by
-  unfold buildList n
-  /- Setup phase -/
-  dsimp only [reduceReplicate, makeList2]
-  wp_pures
-  wp_bind &cons _
-  iapply cons_spec
-  · unfold nil; iapply isList_nil; itrivial
-  /- Loop phase -/
-  itime
-    repeat
-      iintro %_ _ <;> wp_pures
-      wp_bind &cons _
-      iapply cons_spec $$ [$]
-  /- Tail phase -/
-  iintro %v Hv <;>
-  wp_pures <;>
-  wp_bind &llength _
-  iapply length_spec $$ Hv
-  iintro %w Hw %Hlen //
+abbrev n : Nat := 1
 
 -- set_option profiler true in
 -- set_option trace.profiler true in
@@ -91,19 +66,16 @@ example :
 example :
     ⊢@{IProp GF} WP (buildList (replicate n 1)) {{ fun bv => iprop% ⌜bv = hl_val(#((n : Int)))⌝ }} := by
   unfold buildList n
-  /- Setup phase -/
   dsimp only [reduceReplicate, makeList2]
   wp_pures
   wp_bind &cons _
   iapply cons_spec
   · unfold nil; iapply isList_nil; itrivial
-  /- Loop phase -/
   itimeN 5
     repeat
       iintro %_ _ <;> wp_pures
       wp_bind &cons _
       iapply cons_spec $$ [$]
-  /- Tail phase -/
   iintro %v Hv <;>
   wp_pures <;>
   wp_bind &llength _

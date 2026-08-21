@@ -46,4 +46,4 @@ elab "itimeN " n:num tac:tacticSeq : tactic => do
   evalTactic tac
   let msList := ", ".intercalate (samples.toList.map (fun s => fmt3 (msOf s)))
   let hbList := ", ".intercalate (hbs.toList.map toString)
-  logInfo m!"itime: repeats={reps} ms=[{msList}] heartbeats=[{hbList}]"
+  logInfo m!"itime: repeats={reps} ms=[{msList}]"
