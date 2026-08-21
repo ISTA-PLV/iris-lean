@@ -27,13 +27,13 @@ elab "itime " tac:tacticSeq : tactic => do
   evalTactic tac
   let t1 ← IO.monoNanosNow
   let h1 ← IO.getNumHeartbeats
-  logInfo m!"BENCH tag=itime ms={fmt3 (msOf (t1 - t0))} heartbeats={h1 - h0}"
+  logInfo m!"itime: ms={fmt3 (msOf (t1 - t0))} heartbeats={h1 - h0}"
 
 elab "itimeN " n:num tac:tacticSeq : tactic => do
   let reps := max 1 n.getNat
   let mut samples : Array Nat := #[]
-  let mut hb : Nat := 0
-  for i in [0:reps] do
+  let mut hbs : Array Nat := #[]
+  for _ in [0:reps] do
     let st ← saveState
     let h0 ← IO.getNumHeartbeats
     let t0 ← IO.monoNanosNow
@@ -41,10 +41,9 @@ elab "itimeN " n:num tac:tacticSeq : tactic => do
     let t1 ← IO.monoNanosNow
     let h1 ← IO.getNumHeartbeats
     samples := samples.push (t1 - t0)
-    if i == 0 then hb := h1 - h0
+    hbs := hbs.push (h1 - h0)
     st.restore
   evalTactic tac
-  let lo := samples.foldl min samples[0]!
-  let hi := samples.foldl max 0
-  logInfo m!"BENCH tag=itime reps={reps} min_ms={fmt3 (msOf lo)} \
-med_ms={fmt3 (msOf (median samples))} max_ms={fmt3 (msOf hi)} heartbeats={hb}"
+  let msList := ", ".intercalate (samples.toList.map (fun s => fmt3 (msOf s)))
+  let hbList := ", ".intercalate (hbs.toList.map toString)
+  logInfo m!"itime: repeats={reps} ms=[{msList}] heartbeats=[{hbList}]"
