@@ -56,28 +56,58 @@ def buildList (l : List Int) : Exp :=
   let v := &e;
   &llength v
 
-/-- Set the length of the list. -/
-abbrev n : Nat := 1
+syntax "list_bench " num : command
 
--- set_option profiler true in
--- set_option trace.profiler true in
--- set_option trace.profiler.threshold 1 in
-#time
-example :
-    ⊢@{IProp GF} WP (buildList (replicate n 1)) {{ fun bv => iprop% ⌜bv = hl_val(#((n : Int)))⌝ }} := by
-  unfold buildList n
-  dsimp only [reduceReplicate, makeList2]
-  wp_pures
-  wp_bind &cons _
-  iapply cons_spec
-  · unfold nil; iapply isList_nil; itrivial
-  itimeN 5
-    repeat
-      iintro %_ _ <;> wp_pures
+macro_rules
+  | `(list_bench $n:num) => do
+    let name := Lean.mkIdent (Lean.Name.mkSimple s!"wp_buildList_{n.getNat}")
+    let lbl := Lean.Syntax.mkStrLit s!"heaplang_list|cons_loop|{n.getNat}"
+    `(theorem $name :
+        ⊢@{IProp GF} WP (buildList (replicate $n 1)) {{ fun bv => iprop% ⌜bv = hl_val(# $n)⌝ }} := by
+      unfold buildList
+      dsimp only [reduceReplicate, makeList2]
+      wp_pures
       wp_bind &cons _
-      iapply cons_spec $$ [$]
-  iintro %v Hv <;>
-  wp_pures <;>
-  wp_bind &llength _
-  iapply length_spec $$ Hv
-  iintro %w Hw %Hlen //
+      iapply cons_spec
+      · unfold nil; iapply isList_nil; itrivial
+      itimeN 5 $lbl
+        repeat
+          iintro %_ _ <;> wp_pures
+          wp_bind &cons _
+          iapply cons_spec $$ [$]
+      iintro %v Hv <;>
+      wp_pures <;>
+      wp_bind &llength _
+      iapply length_spec $$ Hv
+      iintro %w Hw %Hlen //)
+
+/-
+
+list_bench 10  reps 5
+list_bench 20  reps 5
+list_bench 30  reps 5
+list_bench 40  reps 5
+list_bench 50  reps 5
+list_bench 60  reps 5
+list_bench 70  reps 5
+list_bench 80  reps 5
+list_bench 90  reps 5
+list_bench 100  reps 5
+list_bench 110  reps 5
+list_bench 120  reps 5
+list_bench 130  reps 5
+list_bench 140  reps 5
+list_bench 150  reps 5
+list_bench 160  reps 5
+list_bench 170  reps 5
+list_bench 180  reps 5
+list_bench 190  reps 5
+list_bench 200  reps 5
+list_bench 210  reps 5
+list_bench 220  reps 5
+list_bench 230  reps 5
+list_bench 240  reps 5
+list_bench 250  reps 5
+list_bench 260  reps 5
+
+-/
