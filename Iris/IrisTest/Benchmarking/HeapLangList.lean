@@ -80,34 +80,33 @@ macro_rules
       wp_bind &llength _
       iapply length_spec $$ Hv
       iintro %w Hw %Hlen //)
-
 /-
 
-list_bench 10  reps 5
-list_bench 20  reps 5
-list_bench 30  reps 5
-list_bench 40  reps 5
-list_bench 50  reps 5
-list_bench 60  reps 5
-list_bench 70  reps 5
-list_bench 80  reps 5
-list_bench 90  reps 5
-list_bench 100  reps 5
-list_bench 110  reps 5
-list_bench 120  reps 5
-list_bench 130  reps 5
-list_bench 140  reps 5
-list_bench 150  reps 5
-list_bench 160  reps 5
-list_bench 170  reps 5
-list_bench 180  reps 5
-list_bench 190  reps 5
-list_bench 200  reps 5
-list_bench 210  reps 5
-list_bench 220  reps 5
-list_bench 230  reps 5
-list_bench 240  reps 5
-list_bench 250  reps 5
-list_bench 260  reps 5
+list_bench 10
+list_bench 20
+list_bench 30
+list_bench 40
+list_bench 50
+list_bench 60
+list_bench 70
+list_bench 80
+list_bench 90
+list_bench 100
+list_bench 110
+list_bench 120
+list_bench 130
+list_bench 140
+list_bench 150
+list_bench 160
+list_bench 170
+list_bench 180
+list_bench 190
+list_bench 200
+list_bench 210
+list_bench 220
+list_bench 230
+list_bench 240
+list_bench 250
+list_bench 260
 
 -/
