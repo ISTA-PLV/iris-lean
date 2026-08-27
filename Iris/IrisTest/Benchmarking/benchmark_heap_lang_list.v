@@ -47,312 +47,228 @@ Section proof.
     ⊢@{iProp Σ} WP (buildList (replicate 10 1%Z)) {{ v, ⌜ v = #(10%nat) ⌝ }}.
   Proof.
     idtac "BENCH heaplang_list 10".
-    Time (unfold buildList; cbn [makeList2 replicate]; wp_pures;
-          wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
+    (unfold buildList; cbn [makeList2 replicate]; wp_pures;
+     wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
     Time (repeat (iIntros (?) "?"; wp_pures;
                   wp_bind (cons _); iApply (cons_spec with "[$]"))).
-    Time (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
-          iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
-  Time Qed.
+    (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
+     iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
+  Qed.
+
+  Lemma wp_buildList_15 :
+    ⊢@{iProp Σ} WP (buildList (replicate 15 1%Z)) {{ v, ⌜ v = #(15%nat) ⌝ }}.
+  Proof.
+    idtac "BENCH heaplang_list 15".
+    (unfold buildList; cbn [makeList2 replicate]; wp_pures;
+     wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
+    Time (repeat (iIntros (?) "?"; wp_pures;
+                  wp_bind (cons _); iApply (cons_spec with "[$]"))).
+    (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
+     iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
+  Qed.
 
   Lemma wp_buildList_20 :
     ⊢@{iProp Σ} WP (buildList (replicate 20 1%Z)) {{ v, ⌜ v = #(20%nat) ⌝ }}.
   Proof.
     idtac "BENCH heaplang_list 20".
-    Time (unfold buildList; cbn [makeList2 replicate]; wp_pures;
-          wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
+    (unfold buildList; cbn [makeList2 replicate]; wp_pures;
+     wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
     Time (repeat (iIntros (?) "?"; wp_pures;
                   wp_bind (cons _); iApply (cons_spec with "[$]"))).
-    Time (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
-          iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
-  Time Qed.
+    (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
+     iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
+  Qed.
+
+  Lemma wp_buildList_25 :
+    ⊢@{iProp Σ} WP (buildList (replicate 25 1%Z)) {{ v, ⌜ v = #(25%nat) ⌝ }}.
+  Proof.
+    idtac "BENCH heaplang_list 25".
+    (unfold buildList; cbn [makeList2 replicate]; wp_pures;
+     wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
+    Time (repeat (iIntros (?) "?"; wp_pures;
+                  wp_bind (cons _); iApply (cons_spec with "[$]"))).
+    (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
+     iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
+  Qed.
 
   Lemma wp_buildList_30 :
     ⊢@{iProp Σ} WP (buildList (replicate 30 1%Z)) {{ v, ⌜ v = #(30%nat) ⌝ }}.
   Proof.
     idtac "BENCH heaplang_list 30".
-    Time (unfold buildList; cbn [makeList2 replicate]; wp_pures;
-          wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
+    (unfold buildList; cbn [makeList2 replicate]; wp_pures;
+     wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
     Time (repeat (iIntros (?) "?"; wp_pures;
                   wp_bind (cons _); iApply (cons_spec with "[$]"))).
-    Time (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
-          iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
-  Time Qed.
+    (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
+     iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
+  Qed.
+
+  Lemma wp_buildList_35 :
+    ⊢@{iProp Σ} WP (buildList (replicate 35 1%Z)) {{ v, ⌜ v = #(35%nat) ⌝ }}.
+  Proof.
+    idtac "BENCH heaplang_list 35".
+    (unfold buildList; cbn [makeList2 replicate]; wp_pures;
+     wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
+    Time (repeat (iIntros (?) "?"; wp_pures;
+                  wp_bind (cons _); iApply (cons_spec with "[$]"))).
+    (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
+     iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
+  Qed.
 
   Lemma wp_buildList_40 :
     ⊢@{iProp Σ} WP (buildList (replicate 40 1%Z)) {{ v, ⌜ v = #(40%nat) ⌝ }}.
   Proof.
     idtac "BENCH heaplang_list 40".
-    Time (unfold buildList; cbn [makeList2 replicate]; wp_pures;
-          wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
+    (unfold buildList; cbn [makeList2 replicate]; wp_pures;
+     wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
     Time (repeat (iIntros (?) "?"; wp_pures;
                   wp_bind (cons _); iApply (cons_spec with "[$]"))).
-    Time (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
-          iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
-  Time Qed.
+    (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
+     iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
+  Qed.
+
+  Lemma wp_buildList_45 :
+    ⊢@{iProp Σ} WP (buildList (replicate 45 1%Z)) {{ v, ⌜ v = #(45%nat) ⌝ }}.
+  Proof.
+    idtac "BENCH heaplang_list 45".
+    (unfold buildList; cbn [makeList2 replicate]; wp_pures;
+     wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
+    Time (repeat (iIntros (?) "?"; wp_pures;
+                  wp_bind (cons _); iApply (cons_spec with "[$]"))).
+    (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
+     iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
+  Qed.
 
   Lemma wp_buildList_50 :
     ⊢@{iProp Σ} WP (buildList (replicate 50 1%Z)) {{ v, ⌜ v = #(50%nat) ⌝ }}.
   Proof.
     idtac "BENCH heaplang_list 50".
-    Time (unfold buildList; cbn [makeList2 replicate]; wp_pures;
-          wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
+    (unfold buildList; cbn [makeList2 replicate]; wp_pures;
+     wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
     Time (repeat (iIntros (?) "?"; wp_pures;
                   wp_bind (cons _); iApply (cons_spec with "[$]"))).
-    Time (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
-          iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
-  Time Qed.
+    (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
+     iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
+  Qed.
+
+  Lemma wp_buildList_55 :
+    ⊢@{iProp Σ} WP (buildList (replicate 55 1%Z)) {{ v, ⌜ v = #(55%nat) ⌝ }}.
+  Proof.
+    idtac "BENCH heaplang_list 55".
+    (unfold buildList; cbn [makeList2 replicate]; wp_pures;
+     wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
+    Time (repeat (iIntros (?) "?"; wp_pures;
+                  wp_bind (cons _); iApply (cons_spec with "[$]"))).
+    (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
+     iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
+  Qed.
 
   Lemma wp_buildList_60 :
     ⊢@{iProp Σ} WP (buildList (replicate 60 1%Z)) {{ v, ⌜ v = #(60%nat) ⌝ }}.
   Proof.
     idtac "BENCH heaplang_list 60".
-    Time (unfold buildList; cbn [makeList2 replicate]; wp_pures;
-          wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
+    (unfold buildList; cbn [makeList2 replicate]; wp_pures;
+     wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
     Time (repeat (iIntros (?) "?"; wp_pures;
                   wp_bind (cons _); iApply (cons_spec with "[$]"))).
-    Time (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
-          iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
-  Time Qed.
+    (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
+     iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
+  Qed.
+
+  Lemma wp_buildList_65 :
+    ⊢@{iProp Σ} WP (buildList (replicate 65 1%Z)) {{ v, ⌜ v = #(65%nat) ⌝ }}.
+  Proof.
+    idtac "BENCH heaplang_list 65".
+    (unfold buildList; cbn [makeList2 replicate]; wp_pures;
+     wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
+    Time (repeat (iIntros (?) "?"; wp_pures;
+                  wp_bind (cons _); iApply (cons_spec with "[$]"))).
+    (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
+     iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
+  Qed.
 
   Lemma wp_buildList_70 :
     ⊢@{iProp Σ} WP (buildList (replicate 70 1%Z)) {{ v, ⌜ v = #(70%nat) ⌝ }}.
   Proof.
     idtac "BENCH heaplang_list 70".
-    Time (unfold buildList; cbn [makeList2 replicate]; wp_pures;
-          wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
+    (unfold buildList; cbn [makeList2 replicate]; wp_pures;
+     wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
     Time (repeat (iIntros (?) "?"; wp_pures;
                   wp_bind (cons _); iApply (cons_spec with "[$]"))).
-    Time (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
-          iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
-  Time Qed.
+    (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
+     iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
+  Qed.
+
+  Lemma wp_buildList_75 :
+    ⊢@{iProp Σ} WP (buildList (replicate 75 1%Z)) {{ v, ⌜ v = #(75%nat) ⌝ }}.
+  Proof.
+    idtac "BENCH heaplang_list 75".
+    (unfold buildList; cbn [makeList2 replicate]; wp_pures;
+     wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
+    Time (repeat (iIntros (?) "?"; wp_pures;
+                  wp_bind (cons _); iApply (cons_spec with "[$]"))).
+    (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
+     iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
+  Qed.
 
   Lemma wp_buildList_80 :
     ⊢@{iProp Σ} WP (buildList (replicate 80 1%Z)) {{ v, ⌜ v = #(80%nat) ⌝ }}.
   Proof.
     idtac "BENCH heaplang_list 80".
-    Time (unfold buildList; cbn [makeList2 replicate]; wp_pures;
-          wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
+    (unfold buildList; cbn [makeList2 replicate]; wp_pures;
+     wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
     Time (repeat (iIntros (?) "?"; wp_pures;
                   wp_bind (cons _); iApply (cons_spec with "[$]"))).
-    Time (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
-          iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
-  Time Qed.
+    (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
+     iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
+  Qed.
+
+  Lemma wp_buildList_85 :
+    ⊢@{iProp Σ} WP (buildList (replicate 85 1%Z)) {{ v, ⌜ v = #(85%nat) ⌝ }}.
+  Proof.
+    idtac "BENCH heaplang_list 85".
+    (unfold buildList; cbn [makeList2 replicate]; wp_pures;
+     wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
+    Time (repeat (iIntros (?) "?"; wp_pures;
+                  wp_bind (cons _); iApply (cons_spec with "[$]"))).
+    (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
+     iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
+  Qed.
 
   Lemma wp_buildList_90 :
     ⊢@{iProp Σ} WP (buildList (replicate 90 1%Z)) {{ v, ⌜ v = #(90%nat) ⌝ }}.
   Proof.
     idtac "BENCH heaplang_list 90".
-    Time (unfold buildList; cbn [makeList2 replicate]; wp_pures;
-          wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
+    (unfold buildList; cbn [makeList2 replicate]; wp_pures;
+     wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
     Time (repeat (iIntros (?) "?"; wp_pures;
                   wp_bind (cons _); iApply (cons_spec with "[$]"))).
-    Time (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
-          iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
-  Time Qed.
+    (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
+     iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
+  Qed.
+
+  Lemma wp_buildList_95 :
+    ⊢@{iProp Σ} WP (buildList (replicate 95 1%Z)) {{ v, ⌜ v = #(95%nat) ⌝ }}.
+  Proof.
+    idtac "BENCH heaplang_list 95".
+    (unfold buildList; cbn [makeList2 replicate]; wp_pures;
+     wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
+    Time (repeat (iIntros (?) "?"; wp_pures;
+                  wp_bind (cons _); iApply (cons_spec with "[$]"))).
+    (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
+     iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
+  Qed.
 
   Lemma wp_buildList_100 :
     ⊢@{iProp Σ} WP (buildList (replicate 100 1%Z)) {{ v, ⌜ v = #(100%nat) ⌝ }}.
   Proof.
     idtac "BENCH heaplang_list 100".
-    Time (unfold buildList; cbn [makeList2 replicate]; wp_pures;
-          wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
+    (unfold buildList; cbn [makeList2 replicate]; wp_pures;
+     wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
     Time (repeat (iIntros (?) "?"; wp_pures;
                   wp_bind (cons _); iApply (cons_spec with "[$]"))).
-    Time (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
-          iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
-  Time Qed.
-
-  Lemma wp_buildList_110 :
-    ⊢@{iProp Σ} WP (buildList (replicate 110 1%Z)) {{ v, ⌜ v = #(110%nat) ⌝ }}.
-  Proof.
-    idtac "BENCH heaplang_list 110".
-    Time (unfold buildList; cbn [makeList2 replicate]; wp_pures;
-          wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
-    Time (repeat (iIntros (?) "?"; wp_pures;
-                  wp_bind (cons _); iApply (cons_spec with "[$]"))).
-    Time (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
-          iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
-  Time Qed.
-
-  Lemma wp_buildList_120 :
-    ⊢@{iProp Σ} WP (buildList (replicate 120 1%Z)) {{ v, ⌜ v = #(120%nat) ⌝ }}.
-  Proof.
-    idtac "BENCH heaplang_list 120".
-    Time (unfold buildList; cbn [makeList2 replicate]; wp_pures;
-          wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
-    Time (repeat (iIntros (?) "?"; wp_pures;
-                  wp_bind (cons _); iApply (cons_spec with "[$]"))).
-    Time (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
-          iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
-  Time Qed.
-
-  Lemma wp_buildList_130 :
-    ⊢@{iProp Σ} WP (buildList (replicate 130 1%Z)) {{ v, ⌜ v = #(130%nat) ⌝ }}.
-  Proof.
-    idtac "BENCH heaplang_list 130".
-    Time (unfold buildList; cbn [makeList2 replicate]; wp_pures;
-          wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
-    Time (repeat (iIntros (?) "?"; wp_pures;
-                  wp_bind (cons _); iApply (cons_spec with "[$]"))).
-    Time (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
-          iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
-  Time Qed.
-
-  Lemma wp_buildList_140 :
-    ⊢@{iProp Σ} WP (buildList (replicate 140 1%Z)) {{ v, ⌜ v = #(140%nat) ⌝ }}.
-  Proof.
-    idtac "BENCH heaplang_list 140".
-    Time (unfold buildList; cbn [makeList2 replicate]; wp_pures;
-          wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
-    Time (repeat (iIntros (?) "?"; wp_pures;
-                  wp_bind (cons _); iApply (cons_spec with "[$]"))).
-    Time (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
-          iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
-  Time Qed.
-
-  Lemma wp_buildList_150 :
-    ⊢@{iProp Σ} WP (buildList (replicate 150 1%Z)) {{ v, ⌜ v = #(150%nat) ⌝ }}.
-  Proof.
-    idtac "BENCH heaplang_list 150".
-    Time (unfold buildList; cbn [makeList2 replicate]; wp_pures;
-          wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
-    Time (repeat (iIntros (?) "?"; wp_pures;
-                  wp_bind (cons _); iApply (cons_spec with "[$]"))).
-    Time (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
-          iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
-  Time Qed.
-
-  Lemma wp_buildList_160 :
-    ⊢@{iProp Σ} WP (buildList (replicate 160 1%Z)) {{ v, ⌜ v = #(160%nat) ⌝ }}.
-  Proof.
-    idtac "BENCH heaplang_list 160".
-    Time (unfold buildList; cbn [makeList2 replicate]; wp_pures;
-          wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
-    Time (repeat (iIntros (?) "?"; wp_pures;
-                  wp_bind (cons _); iApply (cons_spec with "[$]"))).
-    Time (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
-          iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
-  Time Qed.
-
-  Lemma wp_buildList_170 :
-    ⊢@{iProp Σ} WP (buildList (replicate 170 1%Z)) {{ v, ⌜ v = #(170%nat) ⌝ }}.
-  Proof.
-    idtac "BENCH heaplang_list 170".
-    Time (unfold buildList; cbn [makeList2 replicate]; wp_pures;
-          wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
-    Time (repeat (iIntros (?) "?"; wp_pures;
-                  wp_bind (cons _); iApply (cons_spec with "[$]"))).
-    Time (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
-          iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
-  Time Qed.
-
-  Lemma wp_buildList_180 :
-    ⊢@{iProp Σ} WP (buildList (replicate 180 1%Z)) {{ v, ⌜ v = #(180%nat) ⌝ }}.
-  Proof.
-    idtac "BENCH heaplang_list 180".
-    Time (unfold buildList; cbn [makeList2 replicate]; wp_pures;
-          wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
-    Time (repeat (iIntros (?) "?"; wp_pures;
-                  wp_bind (cons _); iApply (cons_spec with "[$]"))).
-    Time (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
-          iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
-  Time Qed.
-
-  Lemma wp_buildList_190 :
-    ⊢@{iProp Σ} WP (buildList (replicate 190 1%Z)) {{ v, ⌜ v = #(190%nat) ⌝ }}.
-  Proof.
-    idtac "BENCH heaplang_list 190".
-    Time (unfold buildList; cbn [makeList2 replicate]; wp_pures;
-          wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
-    Time (repeat (iIntros (?) "?"; wp_pures;
-                  wp_bind (cons _); iApply (cons_spec with "[$]"))).
-    Time (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
-          iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
-  Time Qed.
-
-  Lemma wp_buildList_200 :
-    ⊢@{iProp Σ} WP (buildList (replicate 200 1%Z)) {{ v, ⌜ v = #(200%nat) ⌝ }}.
-  Proof.
-    idtac "BENCH heaplang_list 200".
-    Time (unfold buildList; cbn [makeList2 replicate]; wp_pures;
-          wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
-    Time (repeat (iIntros (?) "?"; wp_pures;
-                  wp_bind (cons _); iApply (cons_spec with "[$]"))).
-    Time (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
-          iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
-  Time Qed.
-
-  Lemma wp_buildList_210 :
-    ⊢@{iProp Σ} WP (buildList (replicate 210 1%Z)) {{ v, ⌜ v = #(210%nat) ⌝ }}.
-  Proof.
-    idtac "BENCH heaplang_list 210".
-    Time (unfold buildList; cbn [makeList2 replicate]; wp_pures;
-          wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
-    Time (repeat (iIntros (?) "?"; wp_pures;
-                  wp_bind (cons _); iApply (cons_spec with "[$]"))).
-    Time (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
-          iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
-  Time Qed.
-
-  Lemma wp_buildList_220 :
-    ⊢@{iProp Σ} WP (buildList (replicate 220 1%Z)) {{ v, ⌜ v = #(220%nat) ⌝ }}.
-  Proof.
-    idtac "BENCH heaplang_list 220".
-    Time (unfold buildList; cbn [makeList2 replicate]; wp_pures;
-          wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
-    Time (repeat (iIntros (?) "?"; wp_pures;
-                  wp_bind (cons _); iApply (cons_spec with "[$]"))).
-    Time (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
-          iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
-  Time Qed.
-
-  Lemma wp_buildList_230 :
-    ⊢@{iProp Σ} WP (buildList (replicate 230 1%Z)) {{ v, ⌜ v = #(230%nat) ⌝ }}.
-  Proof.
-    idtac "BENCH heaplang_list 230".
-    Time (unfold buildList; cbn [makeList2 replicate]; wp_pures;
-          wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
-    Time (repeat (iIntros (?) "?"; wp_pures;
-                  wp_bind (cons _); iApply (cons_spec with "[$]"))).
-    Time (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
-          iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
-  Time Qed.
-
-  Lemma wp_buildList_240 :
-    ⊢@{iProp Σ} WP (buildList (replicate 240 1%Z)) {{ v, ⌜ v = #(240%nat) ⌝ }}.
-  Proof.
-    idtac "BENCH heaplang_list 240".
-    Time (unfold buildList; cbn [makeList2 replicate]; wp_pures;
-          wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
-    Time (repeat (iIntros (?) "?"; wp_pures;
-                  wp_bind (cons _); iApply (cons_spec with "[$]"))).
-    Time (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
-          iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
-  Time Qed.
-
-  Lemma wp_buildList_250 :
-    ⊢@{iProp Σ} WP (buildList (replicate 250 1%Z)) {{ v, ⌜ v = #(250%nat) ⌝ }}.
-  Proof.
-    idtac "BENCH heaplang_list 250".
-    Time (unfold buildList; cbn [makeList2 replicate]; wp_pures;
-          wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
-    Time (repeat (iIntros (?) "?"; wp_pures;
-                  wp_bind (cons _); iApply (cons_spec with "[$]"))).
-    Time (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
-          iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
-  Time Qed.
-
-  Lemma wp_buildList_260 :
-    ⊢@{iProp Σ} WP (buildList (replicate 260 1%Z)) {{ v, ⌜ v = #(260%nat) ⌝ }}.
-  Proof.
-    idtac "BENCH heaplang_list 260".
-    Time (unfold buildList; cbn [makeList2 replicate]; wp_pures;
-          wp_bind (cons _); iApply cons_spec; [ iApply isList_nil |]).
-    Time (repeat (iIntros (?) "?"; wp_pures;
-                  wp_bind (cons _); iApply (cons_spec with "[$]"))).
-    Time (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
-          iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
-  Time Qed.
+    (iIntros (?) "Hv"; wp_pures; wp_bind (llength _);
+     iApply (length_spec with "Hv"); iIntros (?) "Hw %Hlen"; done).
+  Qed.
 
 End proof.
