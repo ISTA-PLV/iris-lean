@@ -1,6 +1,7 @@
 /-
-Copyright (c) 2026 Fernando Leal. All rights reserved.
+Copyright (c) The Iris-Lean Contributors
 Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Fernando Leal
 -/
 module
 
@@ -221,6 +222,6 @@ theorem wp_pure_step_later [Inhabited State] [Hexec : PureExec φ n e₁ e₂] (
   | zero => exact .rfl
   | succ n IH =>
     simp only [Nat.repeat]
-    rw [(later_laterN n).to_eq]
+    rw [(laterN_succ_left n).to_eq]
     refine (later_mono IH).trans ?_
     exact step_fupd_intro Std.LawfulSet.subset_refl

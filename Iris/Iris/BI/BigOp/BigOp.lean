@@ -1,5 +1,5 @@
 /-
-Copyright (c) 2025 Zongyuan Liu. All rights reserved.
+Copyright (c) The Iris-Lean Contributors
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Zongyuan Liu
 -/
@@ -582,8 +582,19 @@ instance bi_persistently_and_homomorphism [BI PROP] :
   MonoidHomomorphism.ofEq BI.persistently_ne
     (BiEntails.to_eq persistently_and) (BiEntails.to_eq persistently_true)
 
+@[rocq_alias bi.bi_persistently_or_homomorphism_2]
+instance bi_persistently_or_homomorphism_mpr [BI PROP] :
+    MonoidHomomorphism (or (PROP := PROP)) or iprop(False) iprop(False) (flip Entails)
+      persistently where
+  rel_refl := .rfl
+  rel_trans := flip .trans
+  op_proper := or_mono
+  map_ne := BI.persistently_ne
+  map_op := persistently_or_mpr
+  map_unit := false_elim
+
 @[rocq_alias bi.bi_persistently_or_homomorphism]
-instance bi_persistently_or_homomorphism [BI PROP] :
+instance bi_persistently_or_homomorphism [BI PROP] [BIPersistentlyExist PROP] :
     MonoidHomomorphism (or (PROP := PROP)) or iprop(False) iprop(False) (· = ·) persistently :=
   MonoidHomomorphism.ofEq BI.persistently_ne
     (BiEntails.to_eq persistently_or) (BiEntails.to_eq persistently_pure)

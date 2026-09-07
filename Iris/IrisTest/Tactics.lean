@@ -1,5 +1,5 @@
 /-
-Copyright (c) 2022 Lars König. All rights reserved.
+Copyright (c) The Iris-Lean Contributors
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Lars König, Oliver Soeser, Michael Sammler, Yunsong Yang, Alvin Tang
 -/
@@ -273,9 +273,24 @@ example [BI PROP] [BIAffine PROP] φ (Q : PROP) : ⌜φ⌝ -∗ Q -∗ Q := by
   iintro %Hφ HQ
   iexact HQ
 
-/-- Tests introducing with disjunction pattern inside intuitionistic. -/
-example [BI PROP] (P1 P2 Q : PROP) : □ (P1 ∨ P2) ∗ Q ⊢ Q := by
-  iintro ⟨#(_HP1 | _HP2), HQ⟩ <;> iexact HQ
+/--
+  Tests introducing with disjunction pattern with an intuitionistic hypothesis.
+  With the `BIPersistentlyExist` instance, the resultant hypotheses remain
+  in the intuitionistic context.
+-/
+example [BI PROP] [BIPersistentlyExist PROP] (P1 P2 Q : PROP) :
+    □ (P1 ∨ P2) ∗ Q ⊢ Q := by
+  iintro ⟨#(HP1 | HP2), HQ⟩ <;> iexact HQ
+
+/--
+  Tests introducing with disjunction pattern with an intuitonistic hypothesis.
+  Without the `BIPersistentlyExist` instance, the resultant hypotheses
+  are moved into the persistent context.
+-/
+example [BI PROP] (P1 P2 Q : PROP) : □ (P1 ∨ P2) ∗ Q ⊢ (P1 ∗ Q) ∨ (P2 ∗ Q) := by
+  iintro ⟨#(HP1 | HP2), HQ⟩
+  · ileft; iframe
+  · iright; iframe
 
 /-- Tests introducing multiple spatial hypotheses. -/
 example [BI PROP] (P Q : PROP) : <affine> P -∗ Q -∗ Q := by
@@ -2167,7 +2182,8 @@ example [BI PROP] (Q : Nat → PROP) : (∃ x, Q x) ⊢ ∃ x, Q x ∨ False := 
   iexact H
 
 /-- Tests `icases` with intuitionistic existential. -/
-example [BI PROP] (Q : Nat → PROP) : □ (∃ x, Q x) ⊢ ∃ x, □ Q x ∨ False := by
+example [BI PROP] [BIPersistentlyExist PROP] (Q : Nat → PROP) :
+    □ (∃ x, Q x) ⊢ ∃ x, □ Q x ∨ False := by
   iintro ⟨%x, #H⟩
   iexists x
   ileft
@@ -2182,7 +2198,7 @@ example [BI PROP] P (Q : Nat → PROP) :
 
 /-- Tests `icases` with a comprehensive nested pattern combining existential, pure,
 intuitionistic, spatial, disjunction, and clearing. -/
-example [BI PROP] (φ : Prop) (Q : PROP) :
+example [BI PROP] [BIPersistentlyExist PROP] (φ : Prop) (Q : PROP) :
     □ (∃ _ : Nat, ⌜φ⌝ ∧ Q) ∗ (Q ∨ False) ⊢ Q := by
   iintro H
   icases H with ⟨#⟨%_, %_hφ, ∗HQ⟩, (HQ' | -)⟩

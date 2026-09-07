@@ -1,5 +1,5 @@
 /-
-Copyright (c) 2026 Sergei Stepanenko. All rights reserved.
+Copyright (c) The Iris-Lean Contributors
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Sergei Stepanenko, Zongyuan Liu
 -/
@@ -418,7 +418,7 @@ theorem step_fupdN_fupd_finally (E1 E2 : CoPset) (n : Nat) (P : IProp GF) :
   | succ n IH =>
     simp only [Nat.repeat]
     imod HP
-    iapply fupd_finally_mono (later_laterN n).mpr
+    iapply fupd_finally_mono (laterN_succ_left n).mpr
     iapply fupd_finally_mono (later_mono (laterN_mono n except0_idem.mp))
     iapply fupd_finally_mono (later_mono (except0_laterN (P := iprop(◇ P)) n))
     iapply fupd_finally_later
@@ -546,7 +546,7 @@ theorem step_fupdN_soundness [InvGpreS GF] (n m : Nat) {P : IProp GF} [Plain P] 
   apply fupd_finally_soundness hlc (n := m) (E := ⊤)
   iintro %Hinv Hc
   imod HP $$ Hc with HP
-  rw [(laterN_later n).to_eq]
+  rw [(laterN_succ_right n).to_eq]
   iapply fupd_finally_mono (laterN_mono _ except0_into_later)
   iapply step_fupdN_fupd_finally
   iapply step_fupdN_wand $$ HP
@@ -561,7 +561,7 @@ theorem step_fupdN_soundness_close [InvGpreS GF] (n m : Nat) {P : IProp GF} [Pla
   apply fupd_finally_soundness hlc (n := m) (E := ⊤)
   iintro %Hinv Hc
   ihave HP := HP $$ Hc
-  rw [(laterN_later n).to_eq]
+  rw [(laterN_succ_right n).to_eq]
   iapply fupd_finally_mono (laterN_mono _ except0_into_later)
   iapply step_fupdN_fupd_finally
   iapply step_fupdN_wand $$ HP

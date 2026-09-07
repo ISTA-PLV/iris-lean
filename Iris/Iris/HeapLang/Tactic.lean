@@ -1,5 +1,5 @@
 /-
-Copyright (c) 2026 Fernando Leal. All rights reserved.
+Copyright (c) The Iris-Lean Contributors
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Fernando Leal, Klaus Kraßnitzer
 -/
@@ -146,5 +146,5 @@ where
   go (e' : Q(Exp)) (K : Q(List ECtxItem)) : ProofModeM (Option (ECtxResultOf ogE α)) := do
     if let some a ← observing? <| pred K e' then
       return some {result := a, K, e'}
-    let_expr List.cons Ki K := K | return none
+    let_expr List.cons _ Ki K := K | return none
     go (← fillItem e' Ki) K
