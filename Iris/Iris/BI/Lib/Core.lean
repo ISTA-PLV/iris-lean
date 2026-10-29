@@ -1,5 +1,5 @@
 /-
-Copyright (c) 2026 Alvin Tang. All rights reserved.
+Copyright (c) The Iris-Lean Contributors
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Alvin Tang
 -/
@@ -21,6 +21,7 @@ def coreP [Sbi PROP] (P : PROP) : PROP :=
   iprop% ∀ Q, <affine> ■ (Q -∗ <pers> Q) -∗ <affine> ■ (P -∗ Q) -∗ Q
 
 variable [Sbi PROP]
+local bi PROP
 
 @[rocq_alias coreP_intro]
 theorem coreP_intro {P : PROP} : P -∗ coreP P := by
@@ -109,3 +110,5 @@ theorem coreP_entails' [BIPersistentlyForall PROP] {P Q : PROP} [Affine P] :
 #rocq_ignore coreP_flip_mono "No `Proper` type class in Lean, `rw'` works both ways"
 
 end Core
+
+end Iris
