@@ -1,6 +1,7 @@
 /-
-Copyright (c) 2026 Markus de Medeiros. All rights reserved.
+Copyright (c) The Iris-Lean Contributors
 Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Markus de Medeiros
 -/
 module
 
@@ -15,6 +16,8 @@ namespace Iris.ProgramLogic
 
 open Iris.ProgramLogic.PrimStep
 open Language Language.Notation Relation FromMathlib.Relation.TransGen
+
+local bi (IProp GF)
 
 @[expose] public section
 
@@ -152,7 +155,7 @@ end
 /-! ### Thread-pool ghost-state invariant -/
 
 section ghost
-open Iris CMRA Std
+open Iris ORA Iris.Std
 
 variable {GF : BundledGFunctors}
 variable {H : Type _ → Type _} [LawfulFiniteMap H Nat]
@@ -178,7 +181,7 @@ public abbrev tpInv (tp : List Expr) : IProp GF := iprop%
   ∃ m : H Expr, ⌜∀ n, PartialMap.get? m n = tp[n]?⌝ ∗ TI.tp_name ↪●MAP m
 
 public theorem tpInv_lookup (tp : List Expr) (n : Nat) (e₁ : Expr) (dq : DFrac) :
-    tpInv tp ⊢@{IProp GF} (n ↪thread{dq} e₁) -∗ ⌜tp[n]? = some e₁⌝ := by
+    tpInv tp ⊢ (n ↪thread{dq} e₁) -∗ ⌜tp[n]? = some e₁⌝ := by
   unfold isThread
   iintro ⟨%m, %He, Hauth⟩ Hfrag
   ihave %Hlookup := ghost_map_lookup $$ Hauth Hfrag
@@ -186,7 +189,7 @@ public theorem tpInv_lookup (tp : List Expr) (n : Nat) (e₁ : Expr) (dq : DFrac
   rw [← Hlookup, He _]
 
 public theorem tpInv_update (tp : List Expr) (n : Nat) (e₁ e₂ : Expr) :
-    tpInv tp ⊢@{IProp GF} (n ↪thread e₁) ==∗ tpInv (tp.set n e₂) ∗ (n ↪thread e₂) := by
+    tpInv tp ⊢ (n ↪thread e₁) ==∗ tpInv (tp.set n e₂) ∗ (n ↪thread e₂) := by
   iintro Hinv Hfrag
   ihave %Hlookup := tpInv_lookup $$ Hinv Hfrag
   unfold isThread
@@ -196,17 +199,17 @@ public theorem tpInv_update (tp : List Expr) (n : Nat) (e₁ e₂ : Expr) :
   iframe
   iexists (Std.insert m n e₂)
   iframe; ipureintro; intro n
-  grind [LawfulPartialMap.get?_insert]
+  grind
 
 public theorem tpInv_new_threads (efs tp : List Expr) :
-    ⊢@{IProp GF} tpInv tp ==∗ (tpInv (tp ++ efs) ∗ ([∗list] n ↦ e' ∈ efs, (tp.length + n) ↪thread e')) := by
+    ⊢ tpInv tp ==∗ (tpInv (tp ++ efs) ∗ ([∗list] n ↦ e' ∈ efs, (tp.length + n) ↪thread e')) := by
   unfold isThread
   iintro ⟨%m, %He, Hauth⟩
   have Hdisj : PartialMap.disjoint (FiniteMap.map_seq (M := H) tp.length efs) m := by
     rw [PartialMap.disjoint_iff]
     intro k
     rcases Nat.lt_or_ge k tp.length with h | h
-    · left; rw [LawfulFiniteMap.get?_map_seq, if_neg (by omega)]
+    · left; rw [LawfulFiniteMap.get?_map_seq, ite_eq_right (by omega)]
     · right; rw [He k, List.getElem?_eq_none h]
   imod ghost_map_insert_big (FiniteMap.map_seq tp.length efs) Hdisj $$ Hauth
     with ⟨Hauth, Hlist⟩
@@ -219,8 +222,8 @@ public theorem tpInv_new_threads (efs tp : List Expr) :
     show get? (FiniteMap.map_seq tp.length efs ∪ m) n = (tp ++ efs)[n]?
     rw [LawfulPartialMap.get?_union, LawfulFiniteMap.get?_map_seq, He n]
     rcases Nat.lt_or_ge n tp.length with h | h
-    · rw [if_neg (by omega), List.getElem?_append_left h]; rfl
-    · rw [if_pos h, List.getElem?_append_right h, List.getElem?_eq_none h]
+    · rw [ite_eq_right (by omega), List.getElem?_append_left h]; rfl
+    · rw [ite_eq_left h, List.getElem?_append_right h, List.getElem?_eq_none h]
       cases efs[n - tp.length]? <;> rfl
   · iapply (Iris.BI.BigSepM.bigSepM_map_seq) $$ Hlist
 
@@ -242,14 +245,14 @@ end ghost
 /-! ### Allocation -/
 
 section alloc
-open Iris CMRA Std
+open Iris ORA Iris.Std
 
 variable {GF : BundledGFunctors}
 variable {H : Type _ → Type _} [LawfulFiniteMap H Nat]
 variable {Expr : Type _} [GhostMapG GF Nat Expr H]
 
 public theorem tpInv_alloc :
-    ⊢@{IProp GF} |==> ∃ γ,
+    ⊢ |==> ∃ γ,
       tpInvIni (Expr := Expr) (TI := { toGhostMapG := inferInstance, tp_name := γ }) := by
   imod ghost_map_alloc_empty (H := H) with ⟨%γ, H⟩
   imodintro

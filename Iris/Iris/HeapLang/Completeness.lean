@@ -1,5 +1,5 @@
 /-
-Copyright (c) 2026 Markus de Medeiros. All rights reserved.
+Copyright (c) The Iris-Lean Contributors
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Markus de Medeiros
 -/
@@ -23,9 +23,10 @@ no `rocq_alias` annotations in this file. -/
 @[expose] public section
 namespace Iris.HeapLang
 
-open Iris ProgramLogic Iris.BI Language Language.Notation Std
+open Iris ProgramLogic Iris.BI Language Language.Notation Iris.Std
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [HeapLangGS hlc GF]
+local bi (IProp GF)
 
 @[reducible] def heapCellPts (l : Loc) (vo : Option Val) : IProp GF :=
   match vo with
@@ -328,7 +329,7 @@ theorem wp_baseCompletenessGoal (e₁ : Exp) (σ : State) (E : CoPset)
         · itrivial
         · icases (BigSepM.bigSepM_lookup_acc hgc).1 $$ Hmap with ⟨⟨_, Hmeta1⟩, _⟩
           have hcell_new : get? (allocCells l' n.toNat (some v)) (l' + i) = some (some v) := by
-            rw [get?_allocCells, if_pos ⟨i.toNat, by omega, by rw [Int.toNat_of_nonneg hi0]⟩]
+            rw [get?_allocCells, ite_eq_left ⟨i.toNat, by omega, by rw [Int.toNat_of_nonneg hi0]⟩]
           icases (BigSepM.bigSepM_lookup_acc hcell_new).1 $$ Hnewmeta with ⟨Hmeta2, _⟩
           icases metaToken_ne CoPset.top_ne_empty $$ Hmeta1 Hmeta2 with %hne
           exact absurd rfl hne
@@ -350,7 +351,7 @@ theorem wp_baseCompletenessGoal (e₁ : Exp) (σ : State) (E : CoPset)
       iapply (BigSepM.bigSepM_eqv_of_perm initHeap_heap_eq).2
       iapply (BigSepM.bigSepM_union (allocCells_disjoint hfreshσ)).2
       iframe
-      iapply (equiv_iff.mp BigSepM.bigSepM_sep_eqv).2
+      iapply BigSepM.bigSepM_sep_eq
       iframe
       iapply (BigSepM.bigSepM_mono_of_forall (fun {k vo} => pointsTo_heapCellPts k vo)) $$ Hnewpts
   | newProphS σ p hp =>
@@ -496,7 +497,7 @@ section Framework
 variable {H : Type _ → Type _} [LawfulFiniteMap H Nat] [TpinvGS GF Exp H]
 
 theorem wp_base_completeness {n C e₁ σ K E} :
-  ⊢@{IProp GF} ectxLangCompletenessStmt (Wp.wp Stuckness.NotStuck)
+  ⊢ ectxLangCompletenessStmt (Wp.wp Stuckness.NotStuck)
         (fun (_ : List Exp) (σ : State) => heapInv σ) n C e₁ σ K E := by
   unfold ectxLangCompletenessStmt
   iintro %Hred Htok ⟨Hheap, Htp, %_Hsafe⟩

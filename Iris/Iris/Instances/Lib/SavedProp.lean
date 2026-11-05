@@ -1,5 +1,5 @@
 /-
-Copyright (c) 2026 Markus de Medeiros. All rights reserved.
+Copyright (c) The Iris-Lean Contributors
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Markus de Medeiros
 -/
@@ -16,7 +16,9 @@ public import Iris.ProofMode
 
 namespace Iris
 
-open BI CMRA Agree OFE UPred IProp Std ProofMode COFE
+open BI ORA Agree OFE Iris.UPred IProp Iris.Std ProofMode COFE
+
+local bi (IProp GF)
 
 /-! ## Saved anything -/
 
@@ -57,13 +59,12 @@ instance saved_anything_fractional (γ : GName) (x : F.ap (IProp GF)) :
   fractional p q := by
     unfold saved_anything_own
     refine .trans ?_ iOwn_op
-    refine equiv_iff.mp ?_
-    exact iOwn_ne.eqv (DFracAgree.Frac.mk_op (q₁ := p) (q₂ := q))
+    exact (congrArg (iOwn _) (DFracAgree.Frac.mk_op (q₁ := p) (q₂ := q))).to_bi
 
 @[rocq_alias saved_anything_as_fractional]
 instance saved_anything_as_fractional (γ : GName) (x : F.ap (IProp GF)) (q : Qp) :
     AsFractional (saved_anything_own γ (.own q) x)
-      (fun q => saved_anything_own γ (.own q) x) q where
+      ioΦ (fun q => saved_anything_own γ (.own q) x) ioq q where
   as_fractional := .rfl
   as_fractional_fractional := saved_anything_fractional γ x
 
@@ -72,22 +73,19 @@ instance saved_anything_as_fractional (γ : GName) (x : F.ap (IProp GF)) (q : Qp
 @[rocq_alias saved_anything_alloc_strong]
 theorem saved_anything_alloc_strong (x : F.ap (IProp GF)) (I : GName → Prop) (dq : DFrac)
     (Hdq : ✓ dq) (HI : PredInfinite I) :
-    ⊢@{IProp GF} |==> ∃ γ, ⌜I γ⌝ ∗ saved_anything_own γ dq x := by
+    ⊢ |==> ∃ γ, ⌜I γ⌝ ∗ saved_anything_own γ dq x := by
   unfold saved_anything_own
-  refine iOwn_alloc_strong _ I ?_ ⟨Hdq, toAgree_valid⟩
-  intro N
-  obtain ⟨k, hk, hnk⟩ := HI (List.range N)
-  exact ⟨k, Nat.not_lt.mp (fun h => hnk (List.mem_range.mpr h)), hk⟩
+  exact iOwn_alloc_strong _ I HI.exists_ge ⟨Hdq, toAgree_valid⟩
 
 @[rocq_alias saved_anything_alloc_cofinite]
 theorem saved_anything_alloc_cofinite (x : F.ap (IProp GF)) (G : List GName) (dq : DFrac)
     (Hdq : ✓ dq) :
-    ⊢@{IProp GF} |==> ∃ γ, ⌜γ ∉ G⌝ ∗ saved_anything_own γ dq x :=
+    ⊢ |==> ∃ γ, ⌜γ ∉ G⌝ ∗ saved_anything_own γ dq x :=
   saved_anything_alloc_strong x (· ∉ G) dq Hdq (PredInfinite.not_mem G)
 
 @[rocq_alias saved_anything_alloc]
 theorem saved_anything_alloc (x : F.ap (IProp GF)) (dq : DFrac) (Hdq : ✓ dq) :
-    ⊢@{IProp GF} |==> ∃ γ, saved_anything_own γ dq x := by
+    ⊢ |==> ∃ γ, saved_anything_own γ dq x := by
   unfold saved_anything_own
   exact iOwn_alloc _ ⟨Hdq, toAgree_valid⟩
 
@@ -95,18 +93,18 @@ theorem saved_anything_alloc (x : F.ap (IProp GF)) (dq : DFrac) (Hdq : ✓ dq) :
 
 @[rocq_alias saved_anything_valid]
 theorem saved_anything_valid (γ : GName) (dq : DFrac) (x : F.ap (IProp GF)) :
-    saved_anything_own γ dq x ⊢@{IProp GF} ⌜✓ dq⌝ :=
+    saved_anything_own γ dq x ⊢ ⌜✓ dq⌝ :=
   iOwn_cmraValid.trans (dfrac_agree_validI dq x).mp
 
 @[rocq_alias saved_anything_valid_2]
 theorem saved_anything_valid_2 (γ : GName) (dq1 dq2 : DFrac) (x y : F.ap (IProp GF)) :
-    saved_anything_own γ dq1 x ∗ saved_anything_own γ dq2 y ⊢@{IProp GF}
+    saved_anything_own γ dq1 x ∗ saved_anything_own γ dq2 y ⊢
       ⌜✓ (dq1 • dq2)⌝ ∧ internalEq x y :=
   iOwn_cmraValid_op.trans (dfrac_agree_validI_2 dq1 dq2 x y).mp
 
 @[rocq_alias saved_anything_agree]
 theorem saved_anything_agree (γ : GName) (dq1 dq2 : DFrac) (x y : F.ap (IProp GF)) :
-    saved_anything_own γ dq1 x ∗ saved_anything_own γ dq2 y ⊢@{IProp GF} internalEq x y :=
+    saved_anything_own γ dq1 x ∗ saved_anything_own γ dq2 y ⊢ internalEq x y :=
   (saved_anything_valid_2 γ dq1 dq2 x y).trans and_elim_r
 
 @[rocq_alias saved_anything_combine_gives]
@@ -125,7 +123,7 @@ instance saved_anything_combine_as (γ : GName) (dq1 dq2 : DFrac) (x y : F.ap (I
     icombine Hx Hy gives ⟨-, #H⟩
     irewrite [← H] at Hy
     unfold saved_anything_own
-    iapply (equiv_iff.mp (iOwn_ne.eqv (DFracAgree.mk_op (d₁ := dq1) (d₂ := dq2) (a := x)))).mpr
+    iapply (congrArg (iOwn _) (DFracAgree.mk_op (d₁ := dq1) (d₂ := dq2) (a := x)))
     iapply iOwn_op.mpr
     isplitl [Hx] <;> iassumption
 
@@ -133,13 +131,13 @@ instance saved_anything_combine_as (γ : GName) (dq1 dq2 : DFrac) (x y : F.ap (I
 
 @[rocq_alias saved_anything_persist]
 theorem saved_anything_persist (γ : GName) (dq : DFrac) (x : F.ap (IProp GF)) :
-    saved_anything_own γ dq x ⊢@{IProp GF} |==> saved_anything_own γ .discard x := by
+    saved_anything_own γ dq x ⊢ |==> saved_anything_own γ .discard x := by
   unfold saved_anything_own
   exact iOwn_update DFracAgree.persist
 
 @[rocq_alias saved_anything_unpersist]
 theorem saved_anything_unpersist (γ : GName) (x : F.ap (IProp GF)) :
-    saved_anything_own γ .discard x ⊢@{IProp GF} |==> ∃ q, saved_anything_own γ (.own q) x := by
+    saved_anything_own γ .discard x ⊢ |==> ∃ q, saved_anything_own γ (.own q) x := by
   unfold saved_anything_own
   refine (iOwn_updateP DFracAgree.unpersist).trans (BIUpdate.mono ?_)
   iintro ⟨%a', %hq, Ha⟩
@@ -151,14 +149,14 @@ theorem saved_anything_unpersist (γ : GName) (x : F.ap (IProp GF)) :
 
 @[rocq_alias saved_anything_update]
 theorem saved_anything_update (y : F.ap (IProp GF)) (γ : GName) (x : F.ap (IProp GF)) :
-    saved_anything_own γ (.own 1) x ⊢@{IProp GF} |==> saved_anything_own γ (.own 1) y := by
+    saved_anything_own γ (.own 1) x ⊢ |==> saved_anything_own γ (.own 1) y := by
   unfold saved_anything_own
   exact iOwn_update (Update.exclusive ⟨DFrac.valid_own_one, toAgree_valid⟩)
 
 @[rocq_alias saved_anything_update_2]
 theorem saved_anything_update_2 (y : F.ap (IProp GF)) (γ : GName) (q1 q2 : Qp)
     (x1 x2 : F.ap (IProp GF)) (Hq : q1 + q2 = 1) :
-    saved_anything_own γ (.own q1) x1 ∗ saved_anything_own γ (.own q2) x2 ⊢@{IProp GF} |==>
+    saved_anything_own γ (.own q1) x1 ∗ saved_anything_own γ (.own q2) x2 ⊢ |==>
       (saved_anything_own γ (.own q1) y ∗ saved_anything_own γ (.own q2) y) := by
   unfold saved_anything_own
   have hupd : DFracAgree.mk (.own q1) x1 • DFracAgree.mk (.own q2) x2 ~~>
@@ -171,7 +169,7 @@ theorem saved_anything_update_2 (y : F.ap (IProp GF)) (γ : GName) (q1 q2 : Qp)
 theorem saved_anything_update_halves (y : F.ap (IProp GF)) (γ : GName)
     (x1 x2 : F.ap (IProp GF)) :
     saved_anything_own γ (.own (Qp.half 1)) x1 ∗ saved_anything_own γ (.own (Qp.half 1)) x2
-      ⊢@{IProp GF} |==>
+      ⊢ |==>
         (saved_anything_own γ (.own (Qp.half 1)) y ∗ saved_anything_own γ (.own (Qp.half 1)) y) :=
   saved_anything_update_2 y γ (Qp.half 1) (Qp.half 1) x1 x2 (Qp.half_add_half 1)
 
@@ -209,69 +207,69 @@ instance saved_prop_fractional (γ : GName) (P : IProp GF) :
 
 @[rocq_alias saved_prop_as_fractional]
 instance saved_prop_as_fractional (γ : GName) (P : IProp GF) (q : Qp) :
-    AsFractional (saved_prop_own γ (.own q) P) (fun q => saved_prop_own γ (.own q) P) q where
+    AsFractional (saved_prop_own γ (.own q) P) ioΦ (fun q => saved_prop_own γ (.own q) P) ioq q where
   as_fractional := .rfl
   as_fractional_fractional := saved_prop_fractional γ P
 
 @[rocq_alias saved_prop_alloc_strong]
 theorem saved_prop_alloc_strong (I : GName → Prop) (P : IProp GF) (dq : DFrac)
     (Hdq : ✓ dq) (HI : PredInfinite I) :
-    ⊢@{IProp GF} |==> ∃ γ, ⌜I γ⌝ ∗ saved_prop_own γ dq P :=
+    ⊢ |==> ∃ γ, ⌜I γ⌝ ∗ saved_prop_own γ dq P :=
   saved_anything_alloc_strong _ I dq Hdq HI
 
 @[rocq_alias saved_prop_alloc_cofinite]
 theorem saved_prop_alloc_cofinite (G : List GName) (P : IProp GF) (dq : DFrac) (Hdq : ✓ dq) :
-    ⊢@{IProp GF} |==> ∃ γ, ⌜γ ∉ G⌝ ∗ saved_prop_own γ dq P :=
+    ⊢ |==> ∃ γ, ⌜γ ∉ G⌝ ∗ saved_prop_own γ dq P :=
   saved_anything_alloc_cofinite _ G dq Hdq
 
 @[rocq_alias saved_prop_alloc]
 theorem saved_prop_alloc (P : IProp GF) (dq : DFrac) (Hdq : ✓ dq) :
-    ⊢@{IProp GF} |==> ∃ γ, saved_prop_own γ dq P :=
+    ⊢ |==> ∃ γ, saved_prop_own γ dq P :=
   saved_anything_alloc _ dq Hdq
 
 @[rocq_alias saved_prop_valid]
 theorem saved_prop_valid (γ : GName) (dq : DFrac) (P : IProp GF) :
-    saved_prop_own γ dq P ⊢@{IProp GF} ⌜✓ dq⌝ :=
+    saved_prop_own γ dq P ⊢ ⌜✓ dq⌝ :=
   saved_anything_valid γ dq _
 
 @[rocq_alias saved_prop_valid_2]
 theorem saved_prop_valid_2 (γ : GName) (dq1 dq2 : DFrac) (P Q : IProp GF) :
-    saved_prop_own γ dq1 P ∗ saved_prop_own γ dq2 Q ⊢@{IProp GF}
+    saved_prop_own γ dq1 P ∗ saved_prop_own γ dq2 Q ⊢
       ⌜✓ (dq1 • dq2)⌝ ∧ ▷ internalEq P Q :=
   (saved_anything_valid_2 (F := LaterOF IdOF) γ dq1 dq2 (Later.next P) (Later.next Q)).trans
     (and_mono_right (later_equivI P Q).mp)
 
 @[rocq_alias saved_prop_agree]
 theorem saved_prop_agree (γ : GName) (dq1 dq2 : DFrac) (P Q : IProp GF) :
-    saved_prop_own γ dq1 P ∗ saved_prop_own γ dq2 Q ⊢@{IProp GF} ▷ internalEq P Q :=
+    saved_prop_own γ dq1 P ∗ saved_prop_own γ dq2 Q ⊢ ▷ internalEq P Q :=
   (saved_prop_valid_2 γ dq1 dq2 P Q).trans and_elim_r
 
 @[rocq_alias saved_prop_persist]
 theorem saved_prop_persist (γ : GName) (dq : DFrac) (P : IProp GF) :
-    saved_prop_own γ dq P ⊢@{IProp GF} |==> saved_prop_own γ .discard P :=
+    saved_prop_own γ dq P ⊢ |==> saved_prop_own γ .discard P :=
   saved_anything_persist γ dq _
 
 @[rocq_alias saved_prop_unpersist]
 theorem saved_prop_unpersist (γ : GName) (P : IProp GF) :
-    saved_prop_own γ .discard P ⊢@{IProp GF} |==> ∃ q, saved_prop_own γ (.own q) P :=
+    saved_prop_own γ .discard P ⊢ |==> ∃ q, saved_prop_own γ (.own q) P :=
   saved_anything_unpersist γ _
 
 @[rocq_alias saved_prop_update]
 theorem saved_prop_update (Q : IProp GF) (γ : GName) (P : IProp GF) :
-    saved_prop_own γ (.own 1) P ⊢@{IProp GF} |==> saved_prop_own γ (.own 1) Q :=
+    saved_prop_own γ (.own 1) P ⊢ |==> saved_prop_own γ (.own 1) Q :=
   saved_anything_update _ γ _
 
 @[rocq_alias saved_prop_update_2]
 theorem saved_prop_update_2 (Q : IProp GF) (γ : GName) (q1 q2 : Qp) (P1 P2 : IProp GF)
     (Hq : q1 + q2 = 1) :
-    saved_prop_own γ (.own q1) P1 ∗ saved_prop_own γ (.own q2) P2 ⊢@{IProp GF} |==>
+    saved_prop_own γ (.own q1) P1 ∗ saved_prop_own γ (.own q2) P2 ⊢ |==>
       (saved_prop_own γ (.own q1) Q ∗ saved_prop_own γ (.own q2) Q) :=
   saved_anything_update_2 _ γ q1 q2 _ _ Hq
 
 @[rocq_alias saved_prop_update_halves]
 theorem saved_prop_update_halves (Q : IProp GF) (γ : GName) (P1 P2 : IProp GF) :
     saved_prop_own γ (.own (Qp.half 1)) P1 ∗ saved_prop_own γ (.own (Qp.half 1)) P2
-      ⊢@{IProp GF} |==>
+      ⊢ |==>
         (saved_prop_own γ (.own (Qp.half 1)) Q ∗ saved_prop_own γ (.own (Qp.half 1)) Q) :=
   saved_anything_update_halves _ γ _ _
 
@@ -312,34 +310,34 @@ instance saved_pred_fractional (γ : GName) (Φ : A → IProp GF) :
 
 @[rocq_alias saved_pred_as_fractional]
 instance saved_pred_as_fractional (γ : GName) (Φ : A → IProp GF) (q : Qp) :
-    AsFractional (saved_pred_own γ (.own q) Φ) (fun q => saved_pred_own γ (.own q) Φ) q where
+    AsFractional (saved_pred_own γ (.own q) Φ) ioΦ (fun q => saved_pred_own γ (.own q) Φ) ioq q where
   as_fractional := .rfl
   as_fractional_fractional := saved_pred_fractional γ Φ
 
 @[rocq_alias saved_pred_alloc_strong]
 theorem saved_pred_alloc_strong (I : GName → Prop) (Φ : A → IProp GF) (dq : DFrac)
     (Hdq : ✓ dq) (HI : PredInfinite I) :
-    ⊢@{IProp GF} |==> ∃ γ, ⌜I γ⌝ ∗ saved_pred_own γ dq Φ :=
+    ⊢ |==> ∃ γ, ⌜I γ⌝ ∗ saved_pred_own γ dq Φ :=
   saved_anything_alloc_strong _ I dq Hdq HI
 
 @[rocq_alias saved_pred_alloc_cofinite]
 theorem saved_pred_alloc_cofinite (G : List GName) (Φ : A → IProp GF) (dq : DFrac) (Hdq : ✓ dq) :
-    ⊢@{IProp GF} |==> ∃ γ, ⌜γ ∉ G⌝ ∗ saved_pred_own γ dq Φ :=
+    ⊢ |==> ∃ γ, ⌜γ ∉ G⌝ ∗ saved_pred_own γ dq Φ :=
   saved_anything_alloc_cofinite _ G dq Hdq
 
 @[rocq_alias saved_pred_alloc]
 theorem saved_pred_alloc (Φ : A → IProp GF) (dq : DFrac) (Hdq : ✓ dq) :
-    ⊢@{IProp GF} |==> ∃ γ, saved_pred_own γ dq Φ :=
+    ⊢ |==> ∃ γ, saved_pred_own γ dq Φ :=
   saved_anything_alloc _ dq Hdq
 
 @[rocq_alias saved_pred_valid]
 theorem saved_pred_valid (γ : GName) (dq : DFrac) (Φ : A → IProp GF) :
-    saved_pred_own γ dq Φ ⊢@{IProp GF} ⌜✓ dq⌝ :=
+    saved_pred_own γ dq Φ ⊢ ⌜✓ dq⌝ :=
   saved_anything_valid γ dq _
 
 @[rocq_alias saved_pred_valid_2]
 theorem saved_pred_valid_2 (γ : GName) (dq1 dq2 : DFrac) (Φ Ψ : A → IProp GF) (x : A) :
-    saved_pred_own γ dq1 Φ ∗ saved_pred_own γ dq2 Ψ ⊢@{IProp GF}
+    saved_pred_own γ dq1 Φ ∗ saved_pred_own γ dq2 Ψ ⊢
       ⌜✓ (dq1 • dq2)⌝ ∧ ▷ internalEq (Φ x) (Ψ x) := by
   unfold saved_pred_own
   refine (saved_anything_valid_2 (F := DiscreteFunOF (fun _ : A => LaterOF IdOF))
@@ -348,35 +346,35 @@ theorem saved_pred_valid_2 (γ : GName) (dq1 dq2 : DFrac) (Φ Ψ : A → IProp G
 
 @[rocq_alias saved_pred_agree]
 theorem saved_pred_agree (γ : GName) (dq1 dq2 : DFrac) (Φ Ψ : A → IProp GF) (x : A) :
-    saved_pred_own γ dq1 Φ ∗ saved_pred_own γ dq2 Ψ ⊢@{IProp GF} ▷ internalEq (Φ x) (Ψ x) :=
+    saved_pred_own γ dq1 Φ ∗ saved_pred_own γ dq2 Ψ ⊢ ▷ internalEq (Φ x) (Ψ x) :=
   (saved_pred_valid_2 γ dq1 dq2 Φ Ψ x).trans and_elim_r
 
 @[rocq_alias saved_pred_persist]
 theorem saved_pred_persist (γ : GName) (dq : DFrac) (Φ : A → IProp GF) :
-    saved_pred_own γ dq Φ ⊢@{IProp GF} |==> saved_pred_own γ .discard Φ :=
+    saved_pred_own γ dq Φ ⊢ |==> saved_pred_own γ .discard Φ :=
   saved_anything_persist γ dq _
 
 @[rocq_alias saved_pred_unpersist]
 theorem saved_pred_unpersist (γ : GName) (Φ : A → IProp GF) :
-    saved_pred_own γ .discard Φ ⊢@{IProp GF} |==> ∃ q, saved_pred_own γ (.own q) Φ :=
+    saved_pred_own γ .discard Φ ⊢ |==> ∃ q, saved_pred_own γ (.own q) Φ :=
   saved_anything_unpersist γ _
 
 @[rocq_alias saved_pred_update]
 theorem saved_pred_update (Ψ : A → IProp GF) (γ : GName) (Φ : A → IProp GF) :
-    saved_pred_own γ (.own 1) Φ ⊢@{IProp GF} |==> saved_pred_own γ (.own 1) Ψ :=
+    saved_pred_own γ (.own 1) Φ ⊢ |==> saved_pred_own γ (.own 1) Ψ :=
   saved_anything_update _ γ _
 
 @[rocq_alias saved_pred_update_2]
 theorem saved_pred_update_2 (Ψ : A → IProp GF) (γ : GName) (q1 q2 : Qp) (Φ1 Φ2 : A → IProp GF)
     (Hq : q1 + q2 = 1) :
-    saved_pred_own γ (.own q1) Φ1 ∗ saved_pred_own γ (.own q2) Φ2 ⊢@{IProp GF} |==>
+    saved_pred_own γ (.own q1) Φ1 ∗ saved_pred_own γ (.own q2) Φ2 ⊢ |==>
       (saved_pred_own γ (.own q1) Ψ ∗ saved_pred_own γ (.own q2) Ψ) :=
   saved_anything_update_2 _ γ q1 q2 _ _ Hq
 
 @[rocq_alias saved_pred_update_halves]
 theorem saved_pred_update_halves (Ψ : A → IProp GF) (γ : GName) (Φ1 Φ2 : A → IProp GF) :
     saved_pred_own γ (.own (Qp.half 1)) Φ1 ∗ saved_pred_own γ (.own (Qp.half 1)) Φ2
-      ⊢@{IProp GF} |==>
+      ⊢ |==>
         (saved_pred_own γ (.own (Qp.half 1)) Ψ ∗ saved_pred_own γ (.own (Qp.half 1)) Ψ) :=
   saved_anything_update_halves _ γ _ _
 
