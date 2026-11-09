@@ -1,14 +1,11 @@
 /-
-Copyright (c) 2022 Lars König. All rights reserved.
+Copyright (c) The Iris-Lean Contributors
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Lars König
 -/
 module
 
-public import Iris.Std.Classes
-public meta import Iris.Std.Tactic
-
-public meta import Lean.Elab.Tactic
+public import Iris.Std.Tactic
 
 public meta section
 

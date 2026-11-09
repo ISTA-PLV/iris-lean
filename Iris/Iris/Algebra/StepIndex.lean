@@ -1,11 +1,10 @@
 /-
-Copyright (c) 2026 Alvin Tang. All rights reserved.
+Copyright (c) The Iris-Lean Contributors
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Michael Sammler, Alvin Tang
 -/
 module
 
-public meta import Iris.Std.RocqPorting
 public import Iris.Std.Classes
 
 @[expose] public section
@@ -27,6 +26,7 @@ class SIdx (I : Type u) extends LT I, LE I, Zero I where
 /-- The step-indexing successor operator. -/
 scoped prefix:max "succᵢ" => SIdx.succ
 
+@[rocq_alias SIdxFinite]
 class SIdxFinite (I : Type u) [SIdx I] where
   finite_index : ∀ n : I, n = 0 ∨ ∃ m, n = succᵢ m
 
@@ -41,7 +41,7 @@ class SIdxFinite (I : Type u) [SIdx I] where
 
 namespace SIdx
 
-open Iris Std
+open Iris Iris.Std
 
 variable {I : Type u} [inst : SIdx I] {m n p : I}
 
@@ -390,3 +390,5 @@ theorem rec_lim {P : I → Sort v} (s : P 0) (f : ∀ n, P n → P (succᵢ n))
   rec_zero, rec_succ and rec_lim"
 
 end SIdx
+
+end Iris
